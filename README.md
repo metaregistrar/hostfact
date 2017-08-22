@@ -7,3 +7,5 @@ Usage:
 - In Wefact, select "metaregistrar" as new registrar
 - Enter your EPP-login username and password from Metaregistrar
 - Whitelist the IP address where your Wefact service runs within the Metaregistrar back-end
+
+_Please note: this implementation is work in progress, please report bugs via the "issues" option_
