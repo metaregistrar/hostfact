@@ -62,6 +62,18 @@ class metaregistrar implements IRegistrar
         return true;
     }
 
+
+    /*
+     *
+     * METAREGISTRAR CONNECTION FUNCTIONS
+     * These functions make use of https://github.com/metaregistrar/php-epp-client for EPP connection
+     *
+     *
+     *
+     *
+     *
+     */
+
     /**
      * @return bool
      */
@@ -69,7 +81,7 @@ class metaregistrar implements IRegistrar
         try {
             $this->conn = new Metaregistrar\EPP\metaregEppConnection();
             // Set parameters
-            $this->conn->setHostname('ssl://eppltest1.metaregistrar.com');
+            $this->conn->setHostname('ssl://eppl.metaregistrar.com');
             $this->conn->setPort(7000);
             $this->conn->setUsername($this->User);
             $this->conn->setPassword($this->Password);
@@ -104,6 +116,7 @@ class metaregistrar implements IRegistrar
     }
 
     /**
+     * Create a new domain name
      * @param $domainname
      * @param $registrant
      * @param $adminc
@@ -157,7 +170,8 @@ class metaregistrar implements IRegistrar
         return false;
     }
 
-    /**\
+    /**
+     * Request transfer of a domain name
      * @param $domainname
      * @param $registrant
      * @param $adminc
@@ -330,6 +344,11 @@ class metaregistrar implements IRegistrar
         return false;
     }
 
+    /**
+     * Get all contents of a contact object
+     * @param string $handle
+     * @return bool|\Metaregistrar\EPP\eppInfoContactRequest
+     */
     private function mtrgetcontactinfo($handle) {
         if (!$this->loggedin) {
             if (!$this->login()) {
@@ -340,9 +359,9 @@ class metaregistrar implements IRegistrar
             // Set the contact handle to be queried
             $contact = new \Metaregistrar\EPP\eppContactHandle($handle);
             // Create an EPP contact:info request
-            $info = new \Metaregistrar\EPP\eppInfoContactRequest($contact);
+            $request = new \Metaregistrar\EPP\eppInfoContactRequest($contact);
             // Send the request
-            if ($response = $this->conn->request($info)) {
+            if ($response = $this->conn->request($request)) {
                 /* @var $response \Metaregistrar\EPP\eppInfoContactResponse */
                 // Handle the response
                 $info  = [];
@@ -370,6 +389,7 @@ class metaregistrar implements IRegistrar
     /**
      * @param string $domainname
      * @param bool $autorenew
+     * @return bool
      */
     private function mtrupdateautorenew($domainname, $autorenew) {
         if (!$this->loggedin) {
@@ -401,6 +421,7 @@ class metaregistrar implements IRegistrar
     }
 
     /**
+     * Update the nameservers of the domain name. Specify the new set of nameservers as wanted, the system will determine the changes to be made
      * @param $domainname
      * @param $nameservers
      * @return bool
@@ -473,7 +494,8 @@ class metaregistrar implements IRegistrar
     }
 
     /**
-     * @param $domainname
+     * Check if a domain name is free or taken
+     * @param string $domainname
      * @return bool
      */
     private function mtrcheckdomain($domainname) {
@@ -504,6 +526,11 @@ class metaregistrar implements IRegistrar
         }
     }
 
+    /**
+     * Cancel a domain name
+     * @param string $domainname
+     * @return bool
+     */
     private function mtrdeletedomain($domainname) {
         if (!$this->loggedin) {
             if (!$this->login()) {
@@ -570,6 +597,20 @@ class metaregistrar implements IRegistrar
         }
     }
 
+
+
+
+    /*
+     *
+     * STANDARD Wefact functions
+     * These functions come with the standard Wefact implemenation and call the metaregistrar function where needed
+     *
+     *
+     *
+     *
+     *
+     */
+
     /**
 	 * Check whether a domain is already registered or not.
 	 * 
@@ -626,7 +667,7 @@ class metaregistrar implements IRegistrar
 		// If not, check if WHOIS-data for owner contact is available to search or create new handle
 		elseif($whois->ownerSurName != "")
 		{
-			// Search for existing handle, based on WHOIS data
+			// Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
 			//$ownerHandle = $this->getContactHandle($whois, HANDLE_OWNER);
 			
 			// If no existing handle is found, create new handle
@@ -659,7 +700,7 @@ class metaregistrar implements IRegistrar
 		// If not, check if WHOIS-data for admin contact is available to search or create new handle
 		elseif($whois->adminSurName != "")
 		{
-			// Search for existing handle, based on WHOIS data
+			// Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
 			//$adminHandle = $this->getContactHandle($whois, HANDLE_ADMIN);
 			
 			// If no existing handle is found, create new handle
@@ -692,7 +733,7 @@ class metaregistrar implements IRegistrar
 		// If not, check if WHOIS-data for tech contact is available to search or create new handle
 		elseif($whois->techSurName != "")
 		{
-			// Search for existing handle, based on WHOIS data
+			// Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
 			//$techHandle = $this->getContactHandle($whois, HANDLE_TECH);
 			
 			// If no existing handle is found, create new handle
@@ -765,7 +806,7 @@ class metaregistrar implements IRegistrar
 		// If not, check if WHOIS-data for owner contact is available to search or create new handle
 		elseif($whois->ownerSurName != "")
 		{
-			// Search for existing handle, based on WHOIS data
+			// Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
 			//$ownerHandle = $this->getContactHandle($whois, HANDLE_OWNER);
 			
 			// If no existing handle is found, create new handle
@@ -798,7 +839,7 @@ class metaregistrar implements IRegistrar
 		// If not, check if WHOIS-data for admin contact is available to search or create new handle
 		elseif($whois->adminSurName != "")
 		{
-			// Search for existing handle, based on WHOIS data
+			// Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
 			//$adminHandle = $this->getContactHandle($whois, HANDLE_ADMIN);
 			
 			// If no existing handle is found, create new handle
@@ -831,7 +872,7 @@ class metaregistrar implements IRegistrar
 		// If not, check if WHOIS-data for tech contact is available to search or create new handle
 		elseif($whois->techSurName != "")
 		{
-			// Search for existing handle, based on WHOIS data
+			// Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
 			//$techHandle = $this->getContactHandle($whois, HANDLE_TECH);
 			
 			// If no existing handle is found, create new handle
@@ -942,7 +983,7 @@ class metaregistrar implements IRegistrar
 	 * @return	bool						A list of all domains available in the system.
 	 */
 	function getDomainList($contactHandle = "") {
-        $this->Error[] = "Listing domain names is not supported by Metaregistrar";
+        $this->Error[] = "Listing domain names is not supported by Metaregistrar EPP API";
         return false;
         /**
 		 * Step 1) query domain
