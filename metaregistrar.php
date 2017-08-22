@@ -371,12 +371,12 @@ class metaregistrar implements IRegistrar
                 $info  = [];
                 $postalinfo = $response->getContactPostalInfo();
                 /* @var $postalinfo \Metaregistrar\EPP\eppContactPostalInfo */
-                $info['company'] = $postalinfo->getOrganisationName();
-                $info['name'] = $postalinfo->getName();
-                $info['address'] = $postalinfo->getStreet(0);
-                $info['postcode'] = $postalinfo->getZipcode();
-                $info['city'] = $postalinfo->getCity();
-                $info['countrycode'] = $postalinfo->getCountrycode();
+                $info['company'] = $postalinfo[0]->getOrganisationName();
+                $info['name'] = $postalinfo[0]->getName();
+                $info['address'] = $postalinfo[0]->getStreet(0);
+                $info['postcode'] = $postalinfo[0]->getZipcode();
+                $info['city'] = $postalinfo[0]->getCity();
+                $info['countrycode'] = $postalinfo[0]->getCountrycode();
                 $info['phone'] = $response->getContactVoice();
                 $info['fax'] = $response->getContactFax();
                 $info['email'] = $response->getContactEmail();
@@ -994,46 +994,48 @@ class metaregistrar implements IRegistrar
      * Get a list of all the domains.
      *
      * @param 	string 	$contactHandle		The handle of a contact, so the list could be filtered (usefull for updating domain whois data)
-     * @return	bool						A list of all domains available in the system.
+     * @return	bool|array					A list of all domains available in the system.
      */
     function getDomainList($contactHandle = "") {
-        $this->Error[] = "Listing domain names is not supported by Metaregistrar EPP API";
-        return false;
+        if (!is_file(dirname(__FILE__).'/import/domeinnamen.csv')) {
+            $this->Error[] = "File 'domeinnamen.csv' niet gevonden. Plaats een bestand met domeinnamen in de map 'import' en noem dit bestand 'domeinnamen.csv'";
+            return false;
+        }
         /**
          * Step 1) query domain
          */
         // Query the domain, you can use $domain
         $response 	= true;
         $error_msg 	= '';
-
+        $domains = file(dirname(__FILE__).'/import/domeinnamen.csv',FILE_IGNORE_NEW_LINES);
+        set_time_limit(1000);
 
         /**
          * Step 2) provide feedback to WeFact
          */
-        if($response === true)
+        if ((is_array($domains)) && (count($domains)>0))
         {
             $domain_array = array();
 
             // Loop for all domains:
+            foreach ($domains as $domain) {
+                $info = $this->mtrgetdomaininfo($domain);
+                if ($info) {
+                    $whois = new whois();
+                    $whois->ownerHandle = $info['registrant'];
+                    $whois->adminHandle = $info['admin-c'];
+                    $whois->techHandle 	= $info['tech-c'];
 
-            $nameservers_array = array('ns1.wefact.com','ns2.wefact.com');
-            $whois = new whois();
-            $whois->ownerHandle = 'ABCD001';
-            $whois->adminHandle = 'ABCD001';
-            $whois->techHandle 	= 'ABCD002';
-
-            $expirationdate 	= '2012-05-01';
-            $registrationdate 	= '2000-05-01';
-            $authkey			= '1234567';
-
-            // Return array with data
-            $response = array(	"Domain" => $domain,
-                "Information" => array(	"nameservers" => $nameservers_array, // Array with 1, 2 or 3 elements (hostnames)
-                    "whois" => $whois, // Whois object
-                    "expiration_date" => $expirationdate,  // Empty or date in yyyy-mm-dd
-                    "registration_date" => $registrationdate,  // Empty or date in yyyy-mm-dd
-                    "authkey" => $authkey));
-            $domain_array[] = $response;
+                    // Return array with data
+                    $response = array(	"Domain" => $domain,
+                        "Information" => array(	"nameservers" => $info['nameservers'], // Array with 1, 2 or 3 elements (hostnames)
+                            "whois" => $whois, // Whois object
+                            "expiration_date" => $info['expdate'],  // Empty or date in yyyy-mm-dd
+                            "registration_date" => $info['credate'],  // Empty or date in yyyy-mm-dd
+                            "authkey" => $info['authinfo']));
+                    $domain_array[] = $response;
+                }
+            }
 
             // When loop is ready, return array
             return $domain_array;
@@ -1041,7 +1043,7 @@ class metaregistrar implements IRegistrar
         else
         {
             // No domains can be found
-            $this->Error[] 	= sprintf("Metaregistrar: Error while retreiving domains: %s", $error_msg);
+            $this->Error[] 	= sprintf("Metaregistrar: Lijst met domeinnamen niet gevonden of leeg: %s", $error_msg);
             return false;
         }
     }
@@ -1458,22 +1460,33 @@ class metaregistrar implements IRegistrar
      * @return array List of all contact matching the $surname search criteria.
      */
     function getContactList($surname = "") {
-        $this->Error[] = "Listing contacts is not supported by the Metaregistrar API";
-        return false;
+        if (!is_file(dirname(__FILE__).'/import/contacten.csv')) {
+            $this->Error[] = "Bestand 'contacten.csv' niet gevonden. Plaats een bestand met contact ID's in de map 'import' en noem dit bestand 'contacten.csv'";
+            return false;
+        }
         /**
          * Step 1) Search for contact data
          */
-        $contact_list = array(array("Handle" 		=> "C0222-042",
-            "CompanyName"	=> "BusinessName",
-            "SurName" 		=> "Jackson",
-            "Initials"		=> "C."
-        ),
-            array(	"Handle" 		=> "C0241-001",
-                "CompanyName"	=> "",
-                "SurName" 		=> "Smith",
-                "Initials"		=> "John"
-            )
-        );
+        set_time_limit(1000);
+        $contact_list = [];
+        $contacts = file(dirname(__FILE__).'/import/contacten.csv',FILE_IGNORE_NEW_LINES);
+        if ((is_array($contacts)) && (count($contacts)>0)) {
+            foreach ($contacts as $contact) {
+                $info = $this->mtrgetcontactinfo($contact);
+                $contact_list[] = ["Handle" 		=> $contact,
+                    "CompanyName"	=> $info['company'],
+                    "Initials"		=> "",
+                    "SurName" 		=> $info['name'],
+                    'Address'       => $info['address'],
+                    'ZipCode'       => $info['postcode'],
+                    'City'          => $info['city'],
+                    'Country'       => $info['countrycode'],
+                    'PhoneNumber'   => $info['phone'],
+                    'FaxNumber'     => $info['fax'],
+                    'EmailAddress'  => $info['email']];
+            }
+        }
+
 
 
         /**

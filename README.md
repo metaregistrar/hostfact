@@ -12,4 +12,3 @@ _Please note: this implementation is work in progress, please report bugs via th
 
 TODO:
 - DNS management
-- Import function
