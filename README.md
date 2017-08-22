@@ -9,3 +9,7 @@ Usage:
 - Whitelist the IP address where your Wefact service runs within the Metaregistrar back-end
 
 _Please note: this implementation is work in progress, please report bugs via the "issues" option_
+
+TODO:
+- DNS management
+- Import function
