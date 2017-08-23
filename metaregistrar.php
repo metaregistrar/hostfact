@@ -612,7 +612,67 @@ class metaregistrar implements IRegistrar
     }
 
 
+    /**
+     * Get all DNS records for a specific domain name
+     * @param string $domainname
+     * @return array|bool
+     */
+    function mtrgetdnszone($domainname) {
+        if (!$this->loggedin) {
+            if (!$this->login()) {
+                return false;
+            }
+        }
+        try {
+            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
+            $request = new \Metaregistrar\EPP\metaregInfoDnsRequest($domain);
+            if ($response = $this->conn->request($request)) {
+                /* @var $response \Metaregistrar\EPP\metaregInfoDnsResponse */
+                $content = $response->getContent();
+                return $content;
+            } else {
+                $this->Error[] = 'Error retrieving DNS for '.$domainname;
+                return false;
+            }
 
+        } catch (Metaregistrar\EPP\eppException $e) {
+            if ($e->getCode()==2303) {
+                $this->mtrcreatednszone($domainname);
+                $this->Error[] = "Er waren nog geen DNS gegevens bekend voor deze domeinnaam. De zone is nu aangemaakt, klik opnieuw op 'DNS beheer' om deze te bewerken";
+                return false;
+            } else {
+                $this->Error[] = $e->getMessage();
+                return false;
+            }
+        }
+    }
+
+    function mtrcreatednszone($domainname) {
+        if (!$this->loggedin) {
+            if (!$this->login()) {
+                return false;
+            }
+        }
+        try {
+            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
+            $records = [];
+            $records[] = ['type' => 'NS', 'name' => $domainname, 'content' => 'ns1.yourdomainprovider.net', 'ttl' => 3600];
+            $records[] = ['type' => 'NS', 'name' => $domainname, 'content' => 'ns2.yourdomainprovider.net', 'ttl' => 3600];
+            $records[] = ['type' => 'NS', 'name' => $domainname, 'content' => 'ns3.yourdomainprovider.net', 'ttl' => 3600];
+            $request = new \Metaregistrar\EPP\metaregCreateDnsRequest($domain,$records);
+            if ($response = $this->conn->request($request)) {
+                /* @var $response \Metaregistrar\EPP\metaregInfoDnsResponse */
+                return true;
+            } else {
+                $this->Error[] = 'Error retrieving DNS for '.$domainname;
+                return false;
+            }
+
+        } catch (Metaregistrar\EPP\eppException $e) {
+            $this->Error[] = $e->getMessage();
+            return false;
+        }
+    }
 
     /*
      *
@@ -1512,11 +1572,11 @@ class metaregistrar implements IRegistrar
      * @return bool True if the update was succesfull; False otherwise;
      */
     function updateNameServers($domain, $nameservers = array()) {
+        // TODO: check hostnames and create Glue records when hostnames are not there and domainname matches hostname
         /**
          * Step 1) update nameservers for domain
          */
         // Remove the IP addresses from the nameservers array
-        // TODO: check hostnames and create Glue records when hostnames are not there
         foreach ($nameservers as $index=>$nameserver) {
             if (($index == 'ns1ip') || ($index == 'ns2ip') || ($index == 'ns3ip')) {
                 unset($nameservers[$index]);
@@ -1559,7 +1619,7 @@ class metaregistrar implements IRegistrar
         {
             // Registrar has/supports no DNS templates
             $this->Error[] = 'DNS Templates could not be retrieved at the registrar';
-            return FALSE;
+            return false;
         }
     }
 
@@ -1570,47 +1630,41 @@ class metaregistrar implements IRegistrar
      * @return array Array with DNS zone info and DNS records
      */
     function getDNSZone($domain) {
+
         /**
          * Step 1) get DNS zone
          */
-        $response 	= true;
+        $response 	= $this->mtrgetdnszone($domain);
 
         /**
          * Step 2) provide feedback to WeFact
          */
-        if($response === true)
-        {
+        if($response) {
             $i = 0;
             $dns_zone = array();
 
-            foreach($response['records'] as $record)
-            {
+            foreach($response as $record) {
                 // optionally, you can define records as readonly, these records won't be editable in WeFact
-                if(strtolower($record['type']) == 'soa')
-                {
+                if(strtolower($record['type']) == 'soa') {
                     $record_type = 'records_readonly';
                 }
-                else
-                {
+                else  {
                     $record_type = 'records';
                 }
-
                 $dns_zone[$record_type][$i]['name']        = $record['name'];
                 $dns_zone[$record_type][$i]['type']        = $record['type'];
-                $dns_zone[$record_type][$i]['value']       = $record['value'];
+                $dns_zone[$record_type][$i]['value']       = $record['content'];
                 $dns_zone[$record_type][$i]['priority']    = $record['prio'];
                 $dns_zone[$record_type][$i]['ttl']         = $record['ttl'];
-                $dns_zone[$record_type][$i]['id']          = $record['id']; // not required
-
+                //$dns_zone[$record_type][$i]['id']          = $record['id']; // not required
                 $i++;
             }
 
             return $dns_zone;
         }
-        else
-        {
+        else {
             // DNS zone does not exist or API call failed
-            return FALSE;
+            return false;
         }
     }
 
@@ -1655,6 +1709,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_list_products($ssl_type = '')
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) get all SSL products filtered by the $ssl_type
          */
@@ -1687,6 +1744,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_get_product($templatename)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) get SSL product
          */
@@ -1733,6 +1793,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_request_certificate($ssl_info, $whois)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) request SSL certificate at registrar
          */
@@ -1759,6 +1822,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_get_approver_list($commonname, $templatename)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) get list of approver email adresses at registrar
          */
@@ -1784,6 +1850,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_get_request_status($ssl_order_id)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) get status of SSL certificate
          */
@@ -1827,6 +1896,8 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_download_ssl_certificate($ssl_order_id)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
         /**
          * Step 1) download the SSL certificate
          */
@@ -1854,6 +1925,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_reissue_certificate($ssl_order_id, $ssl_info, $whois)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) reissue the SSL certificate at the registrar
          */
@@ -1880,6 +1954,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_renew_certificate($ssl_info, $whois)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) renew the SSL certificate at the registrar
          */
@@ -1906,6 +1983,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_resend_approver_email($ssl_order_id, $approver_emailaddress)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) resend the approver e-mail
          */
@@ -1931,6 +2011,9 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_revoke_ssl_certificate($ssl_order_id)
     {
+        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        return false;
+
         /**
          * Step 1) revoke the SSL certificate at the registrar
          */
