@@ -3,7 +3,7 @@ Wefact implementation for Metaregistrar domain requests
 
 Usage: 
 - Run Wefact on your own system
-- Create a directory named 'metaregistrar in /Pro/3rdparty/domain/ and copy all this code to this directory
+- Create a directory named _metaregistrar_ in /Pro/3rdparty/domain/ and copy all this code to this directory
 - Whitelist the IP address where your Wefact service runs within the Metaregistrar back-end
 - In Wefact, select "metaregistrar" as new registrar, select domain name and DNS management
 - Enter your EPP-login username and password from Metaregistrar
