@@ -14,6 +14,7 @@ require_once("3rdparty/domain/metaregistrar/autoloader.php");
  * CHANGE LOG:
  * -------------------------------------------------------------------------------------
  *  2017-08-18		E.W. de Graaf 		Initial version
+ *  2017-08-23      E.W. de Graaf       Added DNS management
  * -------------------------------------------------------------------------------------
  */
 
@@ -672,6 +673,43 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
+    }
+
+
+    /**
+     * Update the DNS information, add and remove records in the DNS
+     * @param string $domainname
+     * @param array $adds
+     * @param array $dels
+     * @return bool
+     */
+    private function mtrupdatednszone($domainname, $adds, $dels) {
+        try {
+            $domain = new Metaregistrar\EPP\eppDomain($domainname);
+            if (count($adds) == 0) {
+                $adds = null;
+            }
+            if (count($dels) == 0) {
+                $dels = null;
+            }
+            $update= new Metaregistrar\EPP\metaregUpdateDnsRequest($domain,$adds,$dels,null);
+            $this->Success[] = $update->saveXML();
+            if ($response = $this->conn->request($update)) {
+                if ($response->getResultCode()==1000) {
+                    return true;
+                } else {
+                    $this->Error[] = $response->getResultMessage();
+                    return false;
+                }
+            } else {
+                $this->Error[] = "Error updating DNS";
+                return false;
+            }
+        } catch (\Metaregistrar\EPP\eppException $e) {
+            $this->Error[] = $e->getMessage();
+            return false;
+        }
+
     }
 
     /*
@@ -1618,7 +1656,7 @@ class metaregistrar implements IRegistrar
         else
         {
             // Registrar has/supports no DNS templates
-            $this->Error[] = 'DNS Templates could not be retrieved at the registrar';
+            $this->Error[] = 'DNS Templates worden niet ondersteund door de Metaregistrar API';
             return false;
         }
     }
@@ -1654,9 +1692,9 @@ class metaregistrar implements IRegistrar
                 $dns_zone[$record_type][$i]['name']        = $record['name'];
                 $dns_zone[$record_type][$i]['type']        = $record['type'];
                 $dns_zone[$record_type][$i]['value']       = $record['content'];
-                $dns_zone[$record_type][$i]['priority']    = $record['prio'];
+                $dns_zone[$record_type][$i]['priority']    = $record['priority'];
                 $dns_zone[$record_type][$i]['ttl']         = $record['ttl'];
-                //$dns_zone[$record_type][$i]['id']          = $record['id']; // not required
+                $dns_zone[$record_type][$i]['id']          = $i; // not required
                 $i++;
             }
 
@@ -1682,23 +1720,39 @@ class metaregistrar implements IRegistrar
         use the getDNSZone command and compare it's output with the $dns_zone array
         this way you can check which records are edited and add/delete them accordingly
         */
+        $oldzone = $this->getDNSZone($domain);
+        $adds = [];
+        $dels = [];
 
         /**
          * Step 1) update DNS zone at registrar
          */
-        $response 	= true;
+        foreach ($oldzone['records'] as $record) {
+            if ((isset($record['priority'])) && ($record['priority']>0)) {
+                $dels[] = ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['value'], 'ttl' => $record['ttl'], 'priority' => $record['priority']];
+            } else {
+                $dels[] = ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['value'], 'ttl' => $record['ttl']];
+            }
+        }
+        foreach ($dns_zone['records'] as $record) {
+            $tussen = '';
+            if (strlen($record['name'])>0) {
+                $tussen = '.';
+            }
+            if ((isset($record['priority'])) && ($record['priority']>0)) {
+                $adds[] = ['type' => $record['type'], 'name' => $record['name'].$tussen.$domain, 'content' => $record['value'], 'ttl' => $record['ttl'], 'priority' => $record['priority']];
+            } else {
+                $adds[] = ['type' => $record['type'], 'name' => $record['name'].$tussen.$domain, 'content' => $record['value'], 'ttl' => $record['ttl']];
+            }
+        }
+
 
         /**
          * Step 2) provide feedback to WeFact
          */
-        if($response === true)
-        {
-            return TRUE;
-        }
-        else
-        {
-            return FALSE;
-        }
+        return $this->mtrupdatednszone($domain, $adds, $dels);
+
+
     }
 
     /**

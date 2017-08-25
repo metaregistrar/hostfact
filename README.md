@@ -10,5 +10,7 @@ Usage:
 
 _Please note: this implementation is work in progress, please report bugs via the "issues" option_
 
+This module supports domain name registrations and dns maintenance
+
 TODO:
-- DNS management
+- Add glue records when hostnames match the domainname
