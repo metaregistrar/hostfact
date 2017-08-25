@@ -25,5 +25,5 @@ $version['dns_management_support']   	= true;
 // Does this registrar integration support DNS templates?
 $version['dns_templates_support']       = false;
 // Does this registrar integration support DNS records?
-$version['dns_records_support']         = false;
+$version['dns_records_support']         = true;
 ?>
