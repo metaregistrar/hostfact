@@ -9,7 +9,7 @@ $version['cancel_direct']   = true; // Possible to terminate domains immediately
 $version['cancel_expire']   = true; // Possible to stop auto-renew for domains? true | false
 
 // Information for customer (will be showed at registrar-show-page)
-$version['dev_logo']		= ''; // URL to your logo
+$version['dev_logo']		= 'https://www.metaregistrar.com/wp-content/uploads/2017/08/logo-metaregistrar-small.png'; // URL to your logo
 $version['dev_author']		= 'Metaregistrar BV'; // Your companyname
 $version['dev_website']		= 'https://www.metaregistrar.com'; // URL website
 $version['dev_email']		= 'support@metaregistrar.com'; // Your e-mailaddress for support questions
