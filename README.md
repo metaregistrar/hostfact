@@ -13,8 +13,7 @@ _Please note: If you encounter any issues with this implementation, please repor
 This module supports domain name registrations and dns maintenance
 
 If you want to use Metaregistrar DNS, please make sure your nameservers are set to 
-
-_ns1.yourdomainprovider.net, ns2.yourdomainprovider.net, ns3.yourdomainprovider.net
+_ns1.yourdomainprovider.net, ns2.yourdomainprovider.net, ns3.yourdomainprovider.net_
 
 TODO:
 - Add glue records when hostnames match the domainname
