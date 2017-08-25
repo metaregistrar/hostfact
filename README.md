@@ -8,7 +8,9 @@ Usage:
 - In Wefact, select "metaregistrar" as new registrar, select domain name and DNS management
 - Enter your EPP-login username and password from Metaregistrar
 
-_Please note: If you encounter any issues with this implementation, please report bugs via the "issues" option_
+_Please note: If you encounter any issues with this implementation, please report bugs via the "issues" option._
+
+_If you require support connecting the module to the Metaregistrar back-end, please mail support@metaregistrar.com_
 
 This module supports domain name registrations and dns maintenance
 
