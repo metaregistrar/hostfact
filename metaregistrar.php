@@ -32,10 +32,12 @@ class metaregistrar implements IRegistrar
 
     private $ClassName;
     /**
+     * The connection to Metaregistrar EPP
      * @var \Metaregistrar\EPP\eppConnection
      */
     private $conn;
     /**
+     * Indicates if the user is loggedin, useful for repetitive functions and cleanup
      * @var bool
      */
     private $loggedin;
@@ -86,6 +88,7 @@ class metaregistrar implements IRegistrar
             $this->conn->setPort(7000);
             $this->conn->setUsername($this->User);
             $this->conn->setPassword($this->Password);
+            $this->conn->setConnectionComment("Wefact user");
             // Send EPP login command
             if ($this->conn->login()) {
 //                $this->Success[] = "Succesfully logged-in to metaregistrar with user ".$this->User;
