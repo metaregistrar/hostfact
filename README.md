@@ -8,7 +8,7 @@ Usage:
 - Enter your EPP-login username and password from Metaregistrar
 - Whitelist the IP address where your Wefact service runs within the Metaregistrar back-end
 
-_Please note: this implementation is work in progress, please report bugs via the "issues" option_
+_Please note: If you encounter any issues with this implementation, please report bugs via the "issues" option_
 
 This module supports domain name registrations and dns maintenance
 
