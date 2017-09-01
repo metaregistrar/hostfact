@@ -119,6 +119,19 @@ class metaregistrar implements IRegistrar
         }
     }
 
+
+    private function generateauth($length = 12) {
+        srand((double)microtime()*1000000);
+        $str = '';
+        $characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789=+#@%_';
+        $max = strlen($characters) - 1;
+        for ($i = 0; $i < $length; $i++) {
+            $rand = mt_rand(0, $max);
+            $str .= $characters[$rand];
+        }
+        return $str;
+    }
+
     /**
      * Create a new domain name
      * @param $domainname
@@ -170,7 +183,7 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
-        $this->Error[] = 'General error occurred while creating domain '.$domainname;
+        $this->Error[] = 'Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname;
         return false;
     }
 
@@ -225,7 +238,7 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
-        $this->Error[] = 'General error occurred while creating domain '.$domainname;
+        $this->Error[] = 'Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname;
         return false;
     }
 
@@ -264,7 +277,7 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
-        $this->Error[] = 'General error occurred while updating contact '.$handle;
+        $this->Error[] = 'Algemene fout opgetreden bij bijwerken van contact '.$handle;
         return false;
     }
 
@@ -280,7 +293,7 @@ class metaregistrar implements IRegistrar
         }
         try {
             // Set the contact parameters
-            $postalinfo = new \Metaregistrar\EPP\eppContactPostalInfo($whois->ownerInitials.' '.$whois->ownerSurName, $whois->ownerCity, $whois->ownerCountry, $whois->ownerCompanyName, $whois->ownerAddress, '', $whois->ownerZipCode);
+            $postalinfo = new \Metaregistrar\EPP\eppContactPostalInfo(htmlspecialchars_decode($whois->ownerInitials).' '.htmlspecialchars_decode($whois->ownerSurName), $whois->ownerCity, $whois->ownerCountry, htmlspecialchars_decode($whois->ownerCompanyName), htmlspecialchars_decode($whois->ownerAddress), '', $whois->ownerZipCode);
             if (strlen($whois->ownerFaxNumber) > 0) {
                 if (strpos('+31.',$whois->ownerFaxNumber)===false) {
                     $whois->ownerFaxNumber = $whois->CountryCode . '.' . $whois->ownerFaxNumber;
@@ -309,7 +322,7 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
-        $this->Error[] = 'General error occurred while creating contact';
+        $this->Error[] = 'Algemene fout opgetreden bij aanmaken nieuw contact';
         return false;
     }
 
@@ -348,7 +361,7 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
-        $this->Error[] = 'General error occurred while retrieving domain info for '.$domainname;
+        $this->Error[] = 'Algemene fout opgetreden bij opvragen domeinnaam informatie van '.$domainname;
         return false;
     }
 
@@ -390,7 +403,7 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
-        $this->Error[] = 'General error occurred while retrieving contact info for '.$handle;
+        $this->Error[] = 'Algemene fout opgetreden bij opvragen contact informatie van '.$handle;
         return false;
     }
 
@@ -424,7 +437,7 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
-        $this->Error[] = 'General error occurred while updating nameservers info for '.$domainname;
+        $this->Error[] = 'Algemene fout opgetreden bij wijzigen nameserver informatie van '.$domainname;
         return false;
     }
 
@@ -497,7 +510,7 @@ class metaregistrar implements IRegistrar
             $this->Error[] = $e->getMessage();
             return false;
         }
-        $this->Error[] = 'General error occurred while updating nameservers info for '.$domainname;
+        $this->Error[] = 'Algemene fout opgetreden bij wijzigen nameserver informatie van '.$domainname;
         return false;
     }
 
@@ -799,7 +812,7 @@ class metaregistrar implements IRegistrar
             $this->registrarHandles['owner'] = $ownerHandle;
         } else {
             // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: No domain owner contact given for domain '%s'.", $domain);
+            $this->Error[] = sprintf("Metaregistrar: Geen eigenaar ingesteld voor domeinnaam '%s'.", $domain);
             return false;
         }
 
@@ -832,7 +845,7 @@ class metaregistrar implements IRegistrar
             $this->registrarHandles['admin'] = $adminHandle;
         } else {
             // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: No domain admin contact given for domain '%s'.", $domain);
+            $this->Error[] = sprintf("Metaregistrar: Geen admin-c ingegeven voor domeinnaam '%s'.", $domain);
             return false;
         }
 
@@ -865,7 +878,7 @@ class metaregistrar implements IRegistrar
             $this->registrarHandles['tech'] = $techHandle;
         } else {
             // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: No domain tech contact given for domain '%s'.", $domain);
+            $this->Error[] = sprintf("Metaregistrar: Geen tech-c ingegeven voor domeinnaam '%s'.", $domain);
             return false;
         }
 
@@ -873,7 +886,13 @@ class metaregistrar implements IRegistrar
          * Step 4) obtain nameserver handles
          */
         // If your system uses nameserver groups or handles, you can check the $nameserver array and match these hostnames with your own system.
-
+        $requestns = [];
+        foreach ($nameservers as $index=>$ns) {
+            // Filter out IP addresses
+            if (strpos($index,'ip')===false) {
+                $requestns[] = $ns;
+            }
+        }
         /**
          * Step 5) check your own default settings
          */
@@ -885,8 +904,7 @@ class metaregistrar implements IRegistrar
          * Step 6) register domain
          */
         // Start registering the domain, you can use $domain, $ownerHandle, $adminHandle, $techHandle, $nameservers
-        $authcode = '$KLfdcua0';
-        $response = $this->mtrcreatedomain($domain, $ownerHandle, $adminHandle, $techHandle, $nameservers, $this->Period, $authcode);
+        $response = $this->mtrcreatedomain($domain, $ownerHandle, $adminHandle, $techHandle, $requestns, $this->Period, $this->generateauth());
 
         /**
          * Step 7) provide feedback to WeFact
@@ -938,7 +956,7 @@ class metaregistrar implements IRegistrar
             $this->registrarHandles['owner'] = $ownerHandle;
         } else {
             // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: No domain owner contact given for domain '%s'.", $domain);
+            $this->Error[] = sprintf("Metaregistrar: Geen eigenaar opgegeven voor domeinnaam '%s'.", $domain);
             return false;
         }
 
@@ -971,7 +989,7 @@ class metaregistrar implements IRegistrar
             $this->registrarHandles['admin'] = $adminHandle;
         } else {
             // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: No domain admin contact given for domain '%s'.", $domain);
+            $this->Error[] = sprintf("Metaregistrar: Geen admin-c contact opgegeven voor domeinnaam '%s'.", $domain);
             return false;
         }
 
@@ -1004,7 +1022,7 @@ class metaregistrar implements IRegistrar
             $this->registrarHandles['tech'] = $techHandle;
         } else {
             // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: No domain tech contact given for domain '%s'.", $domain);
+            $this->Error[] = sprintf("Metaregistrar: Geen tech-c contact opgegeven voor domeinnaam '%s'.", $domain);
             return false;
         }
 
@@ -1086,7 +1104,7 @@ class metaregistrar implements IRegistrar
         }
         else {
             // No information can be found
-            $this->Error[] 	= sprintf("Metaregistrar: Error while retrieving information about domain name '%s'", $domain);
+            $this->Error[] 	= sprintf("Metaregistrar: Fout bij opvragen domeininfo van domeinnaam '%s'", $domain);
             return false;
         }
     }
@@ -1205,7 +1223,7 @@ class metaregistrar implements IRegistrar
         else
         {
             // EPP code cannot be retrieved
-            $this->Error[] 	= sprintf("Metaregistrar: Error while retreiving authorization code '%s'", $domain);
+            $this->Error[] 	= sprintf("Metaregistrar: Fout bij opvragen autorisatiecode voor domeinnaam '%s'", $domain);
             return false;
         }
     }
@@ -1225,110 +1243,50 @@ class metaregistrar implements IRegistrar
          *
          * Both scenario's can be found below
          */
-        $scenario = 'onebyone'; // list | onebyone
 
-        if($scenario == 'list')
+        /**
+         * Scenario 2: We must request the info per domain. Take care of script timeout
+         */
+
+        $max_domains_to_check = 1;
+
+        $checked_domains = 0;
+        // Check domain one for one
+        foreach($list_domains as $domain_name => $value)
         {
-            /**
-             * Scenario 1: Get the domain list which provide sufficient information for this function
-             */
-
-            // First copy the array to $check_domains, so we can check if domains doesn't exist anymore
-            $check_domains = $list_domains;
-
-            // Ask registrar for information of all domains
-            $response = array(); // Array with all domains and their information
-
-            if($response === FALSE)
+            // Ask registrar for information of domain
+            $response = array(); // Array with domain information
+            $info = $this->mtrgetdomaininfo($domain_name);
+            if(!$info)
             {
-                $this->Error[] = 'Domain(s) could not be retrieved at the registrar';
-                return FALSE;
+                $list_domains[$domain_name]['Status']    = 'error';
+                $list_domains[$domain_name]['Error_msg'] = 'Domain not found';
+                continue;
             }
 
-            // loop trough the domain list from the registrar
-            foreach($response as $_domain_info)
+            // Add data
+            $nameservers_array  = $info['nameservers'];
+            $expirationdate     = date('Y-m-d',strtotime($info['expdate']));
+            $registrationdate   = date('Y-m-d',strtotime($info['regdate']));
+            $auto_renew         = 'on'; // or 'off'
+
+            // extend the list_domains array with data from the registrar
+            $list_domains[$domain_name]['Information']['nameservers']        = $nameservers_array;
+            $list_domains[$domain_name]['Information']['expiration_date']    = (isset($expirationdate)) ? $expirationdate : '';
+            $list_domains[$domain_name]['Information']['registration_date']  = (isset($registrationdate)) ? $registrationdate : '';
+            $list_domains[$domain_name]['Information']['auto_renew']         = (isset($auto_renew)) ? $auto_renew : '';
+
+            $list_domains[$domain_name]['Status'] = 'success';
+
+            // Increment counter
+            $checked_domains++;
+
+            // Stop loop after max domains
+            if($checked_domains > $max_domains_to_check)
             {
-                $domain_name 		= 'wefact.com';
-
-                if(!isset($list_domains[$domain_name]))
-                {
-                    // Not in list to sync
-                    continue;
-                }
-
-                // Add data
-                $nameservers_array  = array('ns1.wefact.com','ns2.wefact.com');
-                $expirationdate     = '2014-05-01';
-                $auto_renew         = 'on'; // or 'off'
-
-                // extend the list_domains array with data from the registrar
-                $list_domains[$domain_name]['Information']['nameservers']        = $nameservers_array;
-                $list_domains[$domain_name]['Information']['expiration_date']    = (isset($expirationdate)) ? $expirationdate : '';
-                $list_domains[$domain_name]['Information']['auto_renew']         = (isset($auto_renew)) ? $auto_renew : '';
-
-                $list_domains[$domain_name]['Status'] = 'success';
-
-                //unset($check_domains[$domain_key]);
+                break;
             }
 
-            // add errors to the domains that weren't found with the registrar
-            if(count($check_domains) > 0)
-            {
-                foreach($check_domains as $domain_key => $value)
-                {
-                    $list_domains[$domain_key]['Status']    = 'error';
-                    $list_domains[$domain_key]['Error_msg'] = 'Domain not found';
-                }
-            }
-
-            // Return list
-            return $list_domains;
-        }
-        elseif($scenario == 'onebyone')
-        {
-            /**
-             * Scenario 2: We must request the info per domain. Take care of script timeout
-             */
-
-            $max_domains_to_check = 1;
-
-            $checked_domains = 0;
-            // Check domain one for one
-            foreach($list_domains as $domain_name => $value)
-            {
-                // Ask registrar for information of domain
-                $response = array(); // Array with domain information
-                $info = $this->mtrgetdomaininfo($domain_name);
-                if(!$info)
-                {
-                    $list_domains[$domain_name]['Status']    = 'error';
-                    $list_domains[$domain_name]['Error_msg'] = 'Domain not found';
-                    continue;
-                }
-
-                // Add data
-                $nameservers_array  = $info['nameservers'];
-                $expirationdate     = $info['expdate'];
-                $registrationdate   = $info['regdate'];
-                $auto_renew         = 'on'; // or 'off'
-
-                // extend the list_domains array with data from the registrar
-                $list_domains[$domain_name]['Information']['nameservers']        = $nameservers_array;
-                $list_domains[$domain_name]['Information']['expiration_date']    = (isset($expirationdate)) ? $expirationdate : '';
-                $list_domains[$domain_name]['Information']['registration_date']  = (isset($registrationdate)) ? $registrationdate : '';
-                $list_domains[$domain_name]['Information']['auto_renew']         = (isset($auto_renew)) ? $auto_renew : '';
-
-                $list_domains[$domain_name]['Status'] = 'success';
-
-                // Increment counter
-                $checked_domains++;
-
-                // Stop loop after max domains
-                if($checked_domains > $max_domains_to_check)
-                {
-                    break;
-                }
-            }
 
 
             // Return list  (domains which aren't completed with data, will be synced by a next cronjob)
@@ -1364,7 +1322,7 @@ class metaregistrar implements IRegistrar
         else
         {
             // update failed
-            $this->Error[] 	= sprintf("Metaregistrar: Error while changing contact for '%s': %s", $domain, $error_msg);
+            $this->Error[] 	= sprintf("Metaregistrar: Fout bij wijzigen contactinformatie van '%s': %s", $domain, $error_msg);
             return false;
         }
     }
@@ -1507,7 +1465,7 @@ class metaregistrar implements IRegistrar
         else
         {
             // Contact cannot be found
-            $this->Error[] 	= sprintf("Metaregistrar: Error while retrieving contact %s", $handle);
+            $this->Error[] 	= sprintf("Metaregistrar: Fout bij opvragen contactinformatie van %s", $handle);
             return $whois;
         }
     }
@@ -1522,7 +1480,7 @@ class metaregistrar implements IRegistrar
      */
     function getContactHandle($whois = array(), $type = HANDLE_OWNER) {
         // Function to search contact by whois data is not supported
-        $this->Error[] = 'Searching contact handle by providing contact data is not supported by the Metaregistrar API';
+        $this->Error[] = 'Zoeken van contactinformatie via de whois wordt niet ondersteund door de Metaregistrar API';
         return false;
 
         // Determine which contact type should be found
@@ -1766,7 +1724,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_list_products($ssl_type = '')
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
@@ -1801,7 +1759,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_get_product($templatename)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
@@ -1850,7 +1808,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_request_certificate($ssl_info, $whois)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
@@ -1879,7 +1837,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_get_approver_list($commonname, $templatename)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
@@ -1907,7 +1865,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_get_request_status($ssl_order_id)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $$this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
@@ -1953,7 +1911,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_download_ssl_certificate($ssl_order_id)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
         /**
          * Step 1) download the SSL certificate
@@ -1982,7 +1940,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_reissue_certificate($ssl_order_id, $ssl_info, $whois)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
@@ -2011,7 +1969,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_renew_certificate($ssl_info, $whois)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
@@ -2040,7 +1998,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_resend_approver_email($ssl_order_id, $approver_emailaddress)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
@@ -2068,7 +2026,7 @@ class metaregistrar implements IRegistrar
      */
     public function ssl_revoke_ssl_certificate($ssl_order_id)
     {
-        $this->Error[] = "SSL Certificates are not supported yet by the Metaregistrar API";
+        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
         return false;
 
         /**
