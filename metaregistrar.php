@@ -493,7 +493,7 @@ class metaregistrar implements IRegistrar
                     // Create the EPP domain:update request
                     $update = new \Metaregistrar\EPP\eppUpdateDomainRequest($domain, $add, $rem, null);
                     // Send the request
-                    if ($reponse = $this->conn->request($update)) {
+                    if ($response = $this->conn->request($update)) {
                         /* @var $response \Metaregistrar\EPP\eppUpdateDomainResponse */
                         // Handle the response
                         if ($response->getResultCode() == 1000) {
