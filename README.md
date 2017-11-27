@@ -12,6 +12,9 @@ _Please note: If you encounter any issues with this implementation, please repor
 
 _If you require support connecting the module to the Metaregistrar back-end, please mail support@metaregistrar.com_
 
+#### NOTE
+When making connection to the EPP back-end of Metaregistrar, please make sure that port 7000 is not blocked for outgoing requests.
+
 #### This module supports domain name registrations and dns maintenance
 
 If you want to use Metaregistrar DNS, please make sure your nameservers are set to 
@@ -19,3 +22,4 @@ _ns1.yourdomainprovider.net, ns2.yourdomainprovider.net, ns3.yourdomainprovider.
 
 #### TODO
 - Add glue records when hostnames match the domainname
+- Add SSL support
