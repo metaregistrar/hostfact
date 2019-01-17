@@ -295,12 +295,12 @@ class metaregistrar implements IRegistrar
             // Set the contact parameters
             $postalinfo = new \Metaregistrar\EPP\eppContactPostalInfo(htmlspecialchars_decode($whois->ownerInitials).' '.htmlspecialchars_decode($whois->ownerSurName), $whois->ownerCity, $whois->ownerCountry, htmlspecialchars_decode($whois->ownerCompanyName), htmlspecialchars_decode($whois->ownerAddress), '', $whois->ownerZipCode);
             if (strlen($whois->ownerFaxNumber) > 0) {
-                if (strpos('+31.',$whois->ownerFaxNumber)===false) {
+                if (strpos($whois->ownerFaxNumber,'+31.')===false) {
                     $whois->ownerFaxNumber = $whois->CountryCode . '.' . $whois->ownerFaxNumber;
                 }
             }
             if (strlen($whois->ownerPhoneNumber) > 0) {
-                if (strpos('+31.',$whois->ownerPhoneNumber)===false) {
+                if (strpos($whois->ownerPhoneNumber,'+31.')===false) {
                     $whois->ownerPhoneNumber = $whois->CountryCode.'.'.$whois->ownerPhoneNumber;
                 }
             }
