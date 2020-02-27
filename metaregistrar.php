@@ -159,7 +159,9 @@ class metaregistrar implements IRegistrar
             if (is_array($nameservers)) {
                 foreach ($nameservers as $ns) {
                     if (strlen($ns) > 0) {
-                        $domain->addHost(new \Metaregistrar\EPP\eppHost($ns));
+                        if (!filter_var($ns, FILTER_VALIDATE_IP)) {
+                            $domain->addHost(new \Metaregistrar\EPP\eppHost($ns));
+                        }
                     }
                 }
             }
@@ -214,7 +216,9 @@ class metaregistrar implements IRegistrar
             if (is_array($nameservers)) {
                 foreach ($nameservers as $ns) {
                     if (strlen($ns) > 0) {
-                        $domain->addHost(new \Metaregistrar\EPP\eppHost($ns));
+                        if (!filter_var($ns, FILTER_VALIDATE_IP)) {
+                            $domain->addHost(new \Metaregistrar\EPP\eppHost($ns));
+                        }
                     }
                 }
             }
