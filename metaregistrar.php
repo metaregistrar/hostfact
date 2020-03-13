@@ -61,7 +61,7 @@ class metaregistrar implements IRegistrar
      * metaregistrar destructor
      */
     function __destruct(){
-        $this->logout();
+        //$this->logout();
         return true;
     }
 
