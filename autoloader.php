@@ -13,18 +13,6 @@ function autoloadRegistry($className) {
         //echo "Autoloaded registry epp $fileName\n";
         require($fileName);
     }
-    $fileName = str_replace('Metaregistrar\\TMCH\\', '', $className);
-    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-        $fileName = __DIR__ . '\\Registries\\' . $fileName . '\\tmchConnection.php';
-    } else {
-        $fileName = __DIR__ . '/Registries/' . $fileName . '/tmchConnection.php';
-    }
-    //echo "Test autoload registry tmch $fileName\n";
-    if (is_readable($fileName)) {
-        //echo "Autoloaded registry tmch $fileName\n";
-        require($fileName);
-    }
-
 }
 
 function autoloadEPP($className) {

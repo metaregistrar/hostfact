@@ -1252,7 +1252,7 @@ class metaregistrar implements IRegistrar
          * Scenario 2: We must request the info per domain. Take care of script timeout
          */
 
-        $max_domains_to_check = 1;
+        $max_domains_to_check = 100;
 
         $checked_domains = 0;
         // Check domain one for one
@@ -1286,16 +1286,13 @@ class metaregistrar implements IRegistrar
             $checked_domains++;
 
             // Stop loop after max domains
-            if($checked_domains > $max_domains_to_check)
+            if($checked_domains >= $max_domains_to_check)
             {
                 break;
             }
-
-
-
-            // Return list  (domains which aren't completed with data, will be synced by a next cronjob)
-            return $list_domains;
         }
+        // Return list  (domains which aren't completed with data, will be synced by a next cronjob)
+        return $list_domains;
     }
 
     /**
