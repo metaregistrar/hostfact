@@ -56,7 +56,7 @@ class eppHost {
                 }
             }
         } else {
-            if (strlen($ipaddress)) {
+            if (is_string($ipaddress) && strlen($ipaddress)) {
                 $this->setIpAddress($ipaddress);
             }
         }
@@ -67,7 +67,7 @@ class eppHost {
                 }
             }
         } else {
-            if (strlen($hoststatus)) {
+            if (is_string($hoststatus) && strlen($hoststatus)) {
                 $this->setHostStatus($hoststatus);
             }
         }
@@ -83,11 +83,18 @@ class eppHost {
     }
 
     public function getIpAddressCount() {
-        return count($this->ipaddresses);
+        if (is_array($this->ipaddresses)) {
+            return count($this->ipaddresses);
+        }
+        return 0;
+
     }
 
     public function getHostStatusCount() {
-        return count($this->hoststatus);
+        if (is_array($this->hoststatus)) {
+            return count($this->hoststatus);
+        }
+        return 0;
     }
 
     public function getHostStatuses() {

@@ -1,42 +1,13 @@
 <?php
 namespace Metaregistrar\EPP;
-#
-# rfc5910
-#
-/**
- *    <extension>
-<secDNS:infData>
-<secDNS:keyData>
-<secDNS:flags>257</secDNS:flags>
-<secDNS:protocol>3</secDNS:protocol>
-<secDNS:alg>8</secDNS:alg>
-<secDNS:pubKey>AwEAAdHSD0dsAPliSTZAhP4wesBbotNO4TtQSre5ZCiliWXe3h6VAoe+Msd3UQV4/DXgYF1kuy6RdNncbElqnQNdoF8/65cHJJI8hKaDOgqWRDCKp7/2/j/etLDhuyv+ybVo8gIRLnUS55J44PyhiuHeTIsgI5oroKdRhHw1lxpZRdjiue/cZ6E6rVWx2x9p3BUZO3ygZy6pnSQxO5oj7zklTKjyKu4/Bx7sRoZ5FCVKYIx+ENVg52ly4hLLQyFCuOEaI8+hXap0ooNEeCWP7NMH4nIZGKRMSZi485dqLyvIZLMqBxuVOMiUuCTyRggAk7It6X1APDV6dUEoaoEIqWXiCJ8=</secDNS:pubKey>
-</secDNS:keyData>
-</secDNS:infData>
-
-
-<extension>
-<secDNS:infData xmlns:secDNS="urn:ietf:params:xml:ns:secDNS-1.1">
-<secDNS:keyData>
-<secDNS:flags>257</secDNS:flags>
-<secDNS:protocol>3</secDNS:protocol>
-<secDNS:alg>8</secDNS:alg>
-<secDNS:pubKey>AwEAAaQOLIYKhaBDAFDCJk8+ubGyRU0bRxXrB6TQ/MaD6N5ut5pVzbv4YE9AKHBJ36q2lyuLvFObz/xSLd+E0cNDeEYOoNHY53T0LINX6iFs2euyiMbqVPDXksa0C/ZYEx7EVnVTJfLBFI56VxV2Sj8WjrpeKv9Bl+kDg7TLlX7VQunBtPxQrKQyXpfYKHMeGP7+V6wJdDBh6M9EElu7Wi7OgS/FDfO8z7dGSAmSY6xIq/d+DyCQPd5eBkNWRyL3zjyOqa0r3pg2PBmL2+j5KPAsJqN2d0a/g4Ikvv2PnZ/Xvrhrq7NkoWzFxvWEdYxKvNEjoo4rLAjohsL0HBM8tLUiayU=</secDNS:pubKey>
-</secDNS:keyData>
-<secDNS:keyData>
-<secDNS:flags>257</secDNS:flags>
-<secDNS:protocol>3</secDNS:protocol>
-<secDNS:alg>8</secDNS:alg>
-<secDNS:pubKey>AwEAAbqDt56Ez75fGvlA6QRyJaZ8kblN13jW19smEly1N8Wt+plL/ELU5j6cLxhTV6FBHecrVbvkpQY/v848hAXzG5vEUO5rmAib1aZvr9EpFQWW9TPhvusPf5kuM5cv0ypehXP7R1skF5ez8Lroub3RkwoJl0sultyalrMI84DN4eZZr/MtXAYy7X2yaBK9sSXTY7I1Ou2msmXtYXljjOOJ3Pcig7tmrdDPe2Sd2gvuFiwoPj86Ko/L0iCjNIZT6hmvCgCuc6s7sUz4jRJxH/EKmL70c+eoaaCzFouNIw6hz860/ZFBDhMLKhlNTkDpP+sqbc8bhEPlLiYgzVDXmq4uCik=</secDNS:pubKey>
-</secDNS:keyData>
-</secDNS:infData>
-</extension>
+/*
 
  */
 class eppInfoDomainResponse extends eppInfoResponse {
 
 
     /**
+     * Get the domain in the response as eppDomain object
      *
      * @return eppDomain
      */
@@ -47,10 +18,14 @@ class eppInfoDomainResponse extends eppInfoResponse {
         $nameservers = $this->getDomainNameservers();
         $authinfo = $this->getDomainAuthInfo();
         $domain = new eppDomain($domainname, $registrant, $contacts, $nameservers, 1, $authinfo);
+        foreach ($this->getDomainStatuses() as $status) {
+            $domain->addStatus($status);
+        }
         return $domain;
     }
 
     /**
+     * Get the domain name in the response
      *
      * @return string domainname
      */
@@ -60,7 +35,16 @@ class eppInfoDomainResponse extends eppInfoResponse {
 
     /**
      *
-     * @return string status
+     * @return string domainid
+     */
+    public function getDomainId() {
+        return $this->queryPath('/epp:epp/epp:response/epp:resData/domain:infData/domain:roid');
+    }
+
+    /**
+     * Receive an array of statuses
+     *
+     * @return null|string[]
      */
     public function getDomainStatuses() {
         $statuses = null;
@@ -73,6 +57,7 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Receive statuses as CSV string
      *
      * @return string statuses
      */
@@ -81,6 +66,7 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Get the unique domain identifier (roid) for the domainname
      *
      * @return string roid
      */
@@ -89,6 +75,7 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Get the contact handle of the registrant
      *
      * @return string registrant id
      */
@@ -97,7 +84,8 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
-     * 
+     * Get the contact information for a specific contact type (type may be: admin, tech, billing)
+     *
      * @param string $contacttype Type of contact
      * @return string
      */
@@ -106,8 +94,9 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Get the contacts associated with the domain name as eppContactHandle objects
      *
-     * @return array eppContactHandles
+     * @return null|eppContactHandle[]
      */
     public function getDomainContacts() {
         $xpath = $this->xPath();
@@ -147,6 +136,7 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Get the create date of this domain name
      *
      * @return string create_date
      */
@@ -155,6 +145,7 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Get the update date of this domain name
      *
      * @return string update_date
      */
@@ -163,15 +154,16 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Get the expiration date of this domain name
      *
      * @return string expiration_date
      */
     public function getDomainExpirationDate() {
-        date_default_timezone_set("UTC");
         return $this->queryPath('/epp:epp/epp:response/epp:resData/domain:infData/domain:exDate');
     }
 
     /**
+     * Get the sponsoring client id (registrar id) of this domain name
      *
      * @return string client id
      */
@@ -180,6 +172,7 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Get the creating client id (registrar id) of this domain name
      *
      * @return string client id
      */
@@ -188,6 +181,7 @@ class eppInfoDomainResponse extends eppInfoResponse {
     }
 
     /**
+     * Get the client id (registrar id) that last updated the domain name
      *
      * @return string client id
      */
@@ -198,7 +192,8 @@ class eppInfoDomainResponse extends eppInfoResponse {
     /**
      * This function returns the associated nameservers from a domain object
      * Please do not confuse this with getDomainHosts(), which is used for subordinate host objects
-     * @return array of strings
+     *
+     * @return null|eppHost[]
      */
     public function getDomainNameservers() {
         $xpath = $this->xPath();
@@ -221,12 +216,12 @@ class eppInfoDomainResponse extends eppInfoResponse {
                 }
             }
             return $ns;
-        } else {
-            return null;
         }
+        return null;
     }
 
     /**
+     * Get nameservers associated with this domain name as CSV string
      *
      * @return string nameservers
      */
@@ -245,6 +240,7 @@ class eppInfoDomainResponse extends eppInfoResponse {
 
 
     /**
+     * Get the authorization code (transfer token) of this domain name
      *
      * @return string authcode
      */
@@ -252,12 +248,18 @@ class eppInfoDomainResponse extends eppInfoResponse {
         return $this->queryPath('/epp:epp/epp:response/epp:resData/domain:infData/domain:authInfo/domain:pw');
     }
 
+    /**
+     * OBSOLETE, DO NOT USE THIS FUNCTION
+     * If you need DNSSEC KeyData or DSData, see the extension SecDNS-1.1
+     * ALL DNSSEC FUNCTIONS ARE IN THERE
+     * @return null|eppSecdns[]
+     */
     public function getKeydata() {
         // Check if dnssec is enabled on this interface
         if ($this->findNamespace('secDNS')) {
             $xpath = $this->xPath();
             $result = $xpath->query('/epp:epp/epp:response/epp:extension/secDNS:infData/*');
-            $keys = array();
+            $keys = [];
             if ($result->length > 0) {
                 foreach ($result as $keydata) {
                     /* @var $keydata \DOMElement */

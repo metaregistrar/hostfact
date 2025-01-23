@@ -6,6 +6,7 @@ namespace Metaregistrar\EPP;
  * @package Metaregistrar\EPP
  *
  * format of dns records: array with keys type, name, content, ttl, priority
+ * $records[] = ['type'=>'','name'=>'', 'content=>'', 'ttl'=>'', 'priority=>''];
  */
 class metaregCreateDnsRequest extends metaregDnsRequest {
     /**
@@ -21,13 +22,18 @@ class metaregCreateDnsRequest extends metaregDnsRequest {
      *
      * format of dns records: array with keys type, name, content, ttl, priority
      */
-    public function __construct(eppDomain $domain, array $records) {
+    public function __construct(eppDomain $domain, array $records, bool $premium = false) {
         parent::__construct(eppRequest::TYPE_CREATE);
         if (!strlen($domain->getDomainname())) {
             throw new eppException('Domain object does not contain a valid domain name');
         }
         $dname = $this->createElement('dns-ext:name', $domain->getDomainname());
         $this->dnsObject->appendChild($dname);
+        if ($premium) {
+            $dpremium = $this->createElement('dns-ext:premium','true');
+            $this->dnsObject->appendChild($dpremium);
+        }
+
         $this->records = $records;
         foreach ($records as $record) {
             $recordElem = $this->createElement('dns-ext:content');
@@ -40,6 +46,7 @@ class metaregCreateDnsRequest extends metaregDnsRequest {
             }
             $this->dnsObject->appendChild($recordElem);
         }
+        $this->addSessionId();
     }
 
     /**

@@ -75,7 +75,7 @@ class eppContact {
         $this->setVoice($voice);
         $this->setFax($fax);
         $this->setStatus($status);
-        $this->setPassword(self::generateRandomString(10));
+
     }
 
     public function setDisclose($disclose) {
@@ -101,7 +101,7 @@ class eppContact {
      * @throws eppException
      */
     public function addPostalInfo(eppContactPostalInfo $postalInfo) {
-        if (count($this->postalInfo) < 2) {
+        if ((is_array($this->postalInfo)) && (count($this->postalInfo) < 2)) {
             $this->postalInfo[count($this->postalInfo)] = $postalInfo;
         } else {
             throw new eppException('Cannot add more than 3 postal information blocks to a contact');
@@ -163,7 +163,7 @@ class eppContact {
 
     /**
      * Gets the email address
-     * @return string
+     * @return string|null
      */
     public function getEmail() {
         return $this->email;
@@ -178,7 +178,7 @@ class eppContact {
      */
 
     public function setPassword($password) {
-        if ($password) {
+        if ($password !== null) {
             $this->password = htmlspecialchars($password, ENT_COMPAT, "UTF-8");
         } else {
             $this->password = null;
@@ -200,12 +200,12 @@ class eppContact {
      * @return void
      */
     public function setVoice($voice) {
-        $this->voice = $this->validatePhoneNumber($voice);
+        $this->voice = $voice;
     }
 
     /**
      * Gets the phone number
-     * @return string
+     * @return string|null
      */
     public function getVoice() {
         return $this->voice;
@@ -217,7 +217,7 @@ class eppContact {
      * @return void
      */
     public function setFax($fax) {
-        $this->fax = $this->validatePhoneNumber($fax);
+        $this->fax = $fax;
     }
 
     /**
@@ -239,7 +239,7 @@ class eppContact {
         if (!strlen($number)) {
             return null;
         }
-        if ($number{0} != '+') {
+        if ($number[0] != '+') {
             throw new eppException('Phone number ' . $number . ' is not valid for EPP. Valid format is +cc.nnnnnnnnnnn');
         }
         if (strpos($number, '.') === false) {
@@ -274,13 +274,5 @@ class eppContact {
         return uniqid('MRG');
     }
 
-    public static function generateRandomString($length = 10) {
-        $characters = '123456789ABCDEFGHIJKLMNPQRSTUVWXYZ';
-        $charactersLength = strlen($characters);
-        $randomString = '';
-        for ($i = 0; $i < $length; $i++) {
-            $randomString .= $characters[rand(0, $charactersLength - 1)];
-        }
-        return $randomString;
-    }
+
 }

@@ -1,11 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: thomasm
- * Date: 14.09.2015
- * Time: 11:05
- */
-
 namespace Metaregistrar\EPP;
 
 
@@ -193,9 +186,9 @@ trait atEppResponseTrait
 
     public function Success() {
         $resultcode = $this->getResultCode();
-        $success = ($resultcode{0} == '1');
+        $success = ($resultcode[0] == '1');
         if (!$success) {
-            switch ($resultcode{1}) {
+            switch ($resultcode[1]) {
                 case '0':
                     $this->setProblemtype('syntax');
                     break;

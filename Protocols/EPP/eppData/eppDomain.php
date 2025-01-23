@@ -76,7 +76,7 @@ class eppDomain {
 
     /**
      *
-     * @param eppContact $registrant
+     * @param eppContactHandle|string $registrant
      * @param string $authorisationCode
      */
     public function __construct($domainname, $registrant = null, $contacts = null, $hosts = null, $period = 0, $authorisationCode = null) {
@@ -246,7 +246,10 @@ class eppDomain {
      * @return int
      */
     public function getContactLength() {
-        return count($this->contacts);
+        if (is_array($this->contacts)) {
+            return count($this->contacts);
+        }
+        return 0;
     }
 
     /**
@@ -255,10 +258,12 @@ class eppDomain {
      * @return void
      */
     public function addHost(eppHost $host) {
-        if (count($this->hosts) < 13) {
-            $this->hosts[] = $host;
-        } else {
-            throw new eppException('Cannot set more then 13 hosts on object');
+        if (is_array($this->hosts)) {
+            if (count($this->hosts) < 13) {
+                $this->hosts[] = $host;
+            } else {
+                throw new eppException('Cannot set more then 13 hosts on object');
+            }
         }
     }
 
@@ -326,17 +331,12 @@ class eppDomain {
      * @return void
      */
     public function setAuthorisationCode($authorisationCode) {
-        if ($authorisationCode) {
-            $this->authorisationCode = htmlspecialchars($authorisationCode, ENT_COMPAT, "UTF-8");
-        } else {
-            $this->authorisationCode = $authorisationCode;
-        }
-
+        $this->authorisationCode = $authorisationCode;
     }
 
     /**
      *
-     * @return string
+     * @return string|null
      */
     public function getAuthorisationCode() {
         return $this->authorisationCode;
@@ -348,7 +348,7 @@ class eppDomain {
      * @return void
      */
     public function setPassword($password) {
-        $this->authorisationCode = htmlspecialchars($password, ENT_COMPAT, "UTF-8");
+        $this->setAuthorisationCode($password);
     }
 
     /**
@@ -369,7 +369,7 @@ class eppDomain {
 
     /**
      *
-     * @return string
+     * @return array
      */
     public function getStatuses() {
         return $this->statuses;

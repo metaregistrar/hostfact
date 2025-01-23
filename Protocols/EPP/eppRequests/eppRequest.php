@@ -54,6 +54,12 @@ class eppRequest extends \DOMDocument {
      * @var bool
      */
     private $namespacesinroot = true;
+    /**
+     * If true, password are put into CDATA sections
+     * If false, passwords will be in normal XML
+     * @var bool
+     */
+    private $usecdata = false;
 
     function __construct() {
         $this->sessionid = uniqid();
@@ -73,12 +79,30 @@ class eppRequest extends \DOMDocument {
     public function setNamespacesinroot($setting) {
         $this->namespacesinroot = $setting;
     }
-    
+
+    /**
+     * @return bool
+     */
     public function rootNamespaces() {
         return $this->namespacesinroot;
     }
-    
-    protected function getEpp() {
+
+    /**
+     * @param bool $setting
+     */
+    public function setUseCdata($setting) {
+        $this->usecdata = $setting;
+    }
+
+    public function useCdata() {
+        return $this->usecdata;
+    }
+
+    /**
+     * Get the epp element of the epp structure
+     * @return \DomElement
+     */
+    public function getEpp() {
         if (!$this->epp) {
             #
             # if its not there, then create base epp structure
@@ -89,6 +113,10 @@ class eppRequest extends \DOMDocument {
         return $this->epp;
     }
 
+    /**
+     * Get the command element of the epp structure
+     * @return \DomElement
+     */
     protected function getCommand() {
         if (!$this->command) {
             #
@@ -121,7 +149,24 @@ class eppRequest extends \DOMDocument {
             throw new eppException('Cannot set attribute on an empty epp element');
         }
     }
-    
+
+    /**
+     * Adds the namespace to the EPP root element or to the applicable element, depending on the setting
+     * @param string $xmlns
+     * @param string $namespace
+     * @param \DOMElement $object
+     */
+    protected function setNamespace($xmlns, $namespace, $object = null) {
+        $xmlns = str_replace('xmlns:','',$xmlns);
+        if ($this->rootNamespaces()) {
+            $this->getEpp()->setAttribute('xmlns:'.$xmlns,$namespace);
+        } else {
+            if ($object) {
+                $object->setAttribute('xmlns:'.$xmlns,$namespace);
+            }
+        }
+    }
+
     public function addSessionId() {
         #
         # Remove earlier session id's to make sure session id is at the end
@@ -146,23 +191,24 @@ class eppRequest extends \DOMDocument {
     
     
     protected static function isAscii($str) {
-        return mb_check_encoding($str, 'ASCII');
+        if ($str) {
+            return mb_check_encoding($str, 'ASCII');
+        } else {
+            return true;
+        }
+
     }
 
     public function addNamespaces($namespaces) {
         if (is_array($namespaces)) {
             foreach ($namespaces as $namespace => $xmlns) {
-                $this->getEpp()->setAttribute('xmlns:' . $xmlns, $namespace);
-                /*$object = $xmlns.'object';
-                if ($object == 'secDNSobject')
-                {
-                    // ADD SECDNS to domain string
-                    $object = 'domainobject';
+                if (strpos($namespace,'urn')!==false) {
+                    $this->getEpp()->setAttribute('xmlns:' . $xmlns, $namespace);
+                } else {
+                    if ($this->rootNamespaces()) {
+                        $this->getEpp()->setAttribute('xmlns:' . $xmlns, $namespace);
+                    }
                 }
-                if (property_exists($this, $object) && ($this->$object))
-                {
-                    $this->$object->setAttribute('xmlns:'.$xmlns,$namespace);
-                }*/
             }
         }
     }

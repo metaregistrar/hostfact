@@ -4,11 +4,11 @@ namespace Metaregistrar\EPP;
 class eppUpdateDomainRequest extends eppDomainRequest {
 
 
-    function __construct($objectname, $addinfo = null, $removeinfo = null, $updateinfo = null, $forcehostattr=false, $namespacesinroot=true) {
-
+    function __construct($objectname, $addinfo = null, $removeinfo = null, $updateinfo = null, $forcehostattr=false, $namespacesinroot=true, $usecdata = true) {
         $this->setNamespacesinroot($namespacesinroot);
         $this->setForcehostattr($forcehostattr);
         parent::__construct(eppRequest::TYPE_UPDATE);
+        $this->setUseCdata($usecdata);
         if ($objectname instanceof eppDomain) {
             $domainname = $objectname->getDomainname();
         } else {
@@ -31,13 +31,12 @@ class eppUpdateDomainRequest extends eppDomainRequest {
     }
 
 
-        /**
+    /**
      *
      * @param string $domainname
      * @param eppDomain $addInfo
      * @param eppDomain $removeInfo
      * @param eppDomain $updateInfo
-     * @return \domElement
      */
     public function updateDomain($domainname, $addInfo, $removeInfo, $updateInfo) {
         #
@@ -96,10 +95,16 @@ class eppUpdateDomainRequest extends eppDomainRequest {
                 $this->addDomainStatus($element, $status);
             }
         }
-        if (strlen($domain->getAuthorisationCode())) {
+        $authcode = $domain->getAuthorisationCode();
+        if (is_string($authcode) && strlen($authcode)) {
             $authinfo = $this->createElement('domain:authInfo');
-            $pw = $this->createElement('domain:pw');
-            $pw->appendChild($this->createCDATASection($domain->getAuthorisationCode()));
+            if ($this->useCdata()) {
+                $pw = $this->createElement('domain:pw');
+                $pw->appendChild($this->createCDATASection($authcode));
+            }
+            else {
+                $pw = $this->createElement('domain:pw',$authcode);
+            }
             $authinfo->appendChild($pw);
             $element->appendChild($authinfo);
         }

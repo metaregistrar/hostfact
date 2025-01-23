@@ -8,10 +8,10 @@ class eppCreateContactRequest extends eppContactRequest {
      * @param eppContact|null $createinfo
      * @throws eppException
      */
-    function __construct($createinfo, $namespacesinroot = true) {
+    function __construct($createinfo, $namespacesinroot = true, $usecdata = true) {
         $this->setNamespacesinroot($namespacesinroot);
         parent::__construct(eppRequest::TYPE_CREATE);
-        
+        $this->setUseCdata($usecdata);
         if ($createinfo){
             if ($createinfo instanceof eppContact) {
                 $this->setContact($createinfo);
@@ -32,15 +32,16 @@ class eppCreateContactRequest extends eppContactRequest {
      * @throws eppException
      */
     public function setContact(eppContact $contact) {
-        #
-        # Object create structure
-        #
         $this->setContactId($contact->getId());
         $this->setPostalInfo($contact->getPostalInfo(0));
         $this->setVoice($contact->getVoice());
         $this->setFax($contact->getFax());
         $this->setEmail($contact->getEmail());
-        $this->setPassword($contact->getPassword());
+        if ($contact->getPassword()) {
+            $this->setPassword($contact->getPassword());
+        } else {
+            $this->setPassword(self::generateRandomString(10));
+        }
         $this->setDisclose($contact->getDisclose());
     }
 
@@ -115,7 +116,12 @@ class eppCreateContactRequest extends eppContactRequest {
         if (!is_null($password))
         {
             $authinfo = $this->createElement('contact:authInfo');
-            $authinfo->appendChild($this->createElement('contact:pw', $password));
+            if ($this->useCdata()) {
+                $pw = $authinfo->appendChild($this->createElement('contact:pw'));
+                $pw->appendChild($this->createCDATASection($password));
+            } else {
+                $authinfo->appendChild($this->createElement('contact:pw', $password));
+            }
             $this->contactobject->appendChild($authinfo);
         }
     }
@@ -143,6 +149,16 @@ class eppCreateContactRequest extends eppContactRequest {
             $disclose->appendChild($this->createElement('contact:email'));
             $this->contactobject->appendChild($disclose);
         }
+    }
+
+    public static function generateRandomString($length = 10) {
+        $characters = '123456789ABCDEFGHIJKLMNPQRSTUVWXYZ';
+        $charactersLength = strlen($characters);
+        $randomString = '';
+        for ($i = 0; $i < $length; $i++) {
+            $randomString .= $characters[rand(0, $charactersLength - 1)];
+        }
+        return $randomString;
     }
 }
 
