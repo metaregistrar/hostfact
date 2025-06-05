@@ -1,21 +1,21 @@
 <?php
 require_once("3rdparty/domain/IRegistrar.php");
 require_once("3rdparty/domain/standardfunctions.php");
-require_once("3rdparty/domain/metaregistrar/autoloader.php");
-
+require_once("3rdparty/domain/metaregistrar/mtr.php");
 /**
  * -------------------------------------------------------------------------------------
  * Metaregistrar - IRegistrar
  *
  * Author		: Ewout de Graaf
  * Copyright	: (c) 2018 Metaregistrar BV
- * Version 		: 1.0
+ * Version 		: 1.2
  *
  * CHANGE LOG:
  * -------------------------------------------------------------------------------------
  *  2017-08-18		E.W. de Graaf 		Initial version
  *  2017-08-23      E.W. de Graaf       Added DNS management
  *  2025-06-01      E.W. de Graaf       Small fixes, up-to-date with php 8.x
+ *  2025-06-01      E.W. de Graaf       Fixed proper syncing of auto-renew flag for domain name
  * -------------------------------------------------------------------------------------
  */
 
@@ -32,21 +32,13 @@ class metaregistrar implements IRegistrar
     public $registrarHandles = array();
 
     private $ClassName;
-    /**
-     * The connection to Metaregistrar EPP
-     * @var \Metaregistrar\EPP\eppConnection
-     */
-    private $conn;
-    /**
-     * Indicates if the user is loggedin, useful for repetitive functions and cleanup
-     * @var bool
-     */
-    private $loggedin;
+    /* @var $mtr mtr() */
+    private $mtr = null;
 
     /**
      * metaregistrar constructor.
      */
-    function __construct(){
+    function __construct() {
         $this->ClassName = __CLASS__;
         $this->Error = array();
         $this->Warning = array();
@@ -57,683 +49,14 @@ class metaregistrar implements IRegistrar
     /**
      * metaregistrar destructor
      */
-    function __destruct(){
-        //$this->logout();
+    function __destruct() {
         return true;
-    }
-
-
-    /*
-     *
-     * METAREGISTRAR CONNECTION FUNCTIONS
-     * These functions make use of https://github.com/metaregistrar/php-epp-client for EPP connection
-     */
-
-    /**
-     * @return bool
-     */
-    private function login() {
-        try {
-            $this->conn = new Metaregistrar\EPP\metaregEppConnection();
-            // Set parameters
-            $this->conn->setHostname('ssl://eppl.metaregistrar.com');
-            $this->conn->setPort(7000);
-            $this->conn->setUsername($this->User);
-            $this->conn->setPassword($this->Password);
-            $this->conn->setConnectionComment("Wefact user");
-            // Send EPP login command
-            if ($this->conn->login()) {
-//                $this->Success[] = "Succesfully logged-in to metaregistrar with user ".$this->User;
-                $this->loggedin = true;
-                return true;
-            } else {
-                $this->Error[] = "Unable to login with user id: ".$this->User;
-                return false;
-            }
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-    }
-
-    /**
-     *
-     */
-    private function logout() {
-        // Log out of EPP when still connected
-        if ($this->conn) {
-            if ($this->loggedin) {
-                // When still logged-in, logout
-                $this->conn->logout();
-                $this->loggedin = false;
-            }
-            $this->conn->disconnect();
-        }
-    }
-
-
-    private function generateauth($length = 12) {
-        srand((double)microtime()*1000000);
-        $str = '';
-        $characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789=+#@%_';
-        $max = strlen($characters) - 1;
-        for ($i = 0; $i < $length; $i++) {
-            $rand = mt_rand(0, $max);
-            $str .= $characters[$rand];
-        }
-        return $str;
-    }
-
-    /**
-     * Create a new domain name
-     * @param $domainname
-     * @param $registrant
-     * @param $adminc
-     * @param $techc
-     * @param $nameservers
-     * @param $period
-     * @param $authcode
-     * @return bool
-     */
-    private function mtrcreatedomain($domainname, $registrant, $adminc, $techc, $nameservers, $period, $authcode) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            // Set domain parameters
-            $domain->setRegistrant($registrant);
-            $domain->addContact(new \Metaregistrar\EPP\eppContactHandle($adminc,\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_ADMIN));
-            $domain->addContact(new \Metaregistrar\EPP\eppContactHandle($techc,\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_TECH));
-            $domain->addContact(new \Metaregistrar\EPP\eppContactHandle($techc,\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_BILLING));
-            if (is_array($nameservers)) {
-                foreach ($nameservers as $ns) {
-                    if (strlen($ns) > 0) {
-                        if (!filter_var($ns, FILTER_VALIDATE_IP)) {
-                            $domain->addHost(new \Metaregistrar\EPP\eppHost($ns));
-                        }
-                    }
-                }
-            }
-            $domain->setPeriod($period);
-            $domain->setPeriodUnit('y');
-            $domain->setAuthorisationCode($authcode);
-            // Make EPP request to create domain
-            $create = new \Metaregistrar\EPP\eppCreateDomainRequest($domain);
-            // Send the request
-            if ($response = $this->conn->request($create)) {
-                /* @var $response \Metaregistrar\EPP\eppCreateDomainResponse */
-                // Process the response
-                if (($response->getResultCode()==1000) || ($response->getResultCode()==1001)) {
-                    return true;
-                } else {
-                    $this->Error[] = $response->getResultMessage().' '.$response->getResultReason();
-                    return false;
-                }
-            } // ELSE function is caught by eppException
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname;
-        return false;
-    }
-
-    /**
-     * Request transfer of a domain name
-     * @param $domainname
-     * @param $registrant
-     * @param $adminc
-     * @param $techc
-     * @param $nameservers
-     * @param $period
-     * @param $authcode
-     * @return bool
-     */
-    private function mtrtransferdomain($domainname, $registrant, $adminc, $techc, $nameservers, $period, $authcode) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // Set domain transfer parameters
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            $domain->setRegistrant($registrant);
-            $domain->addContact(new \Metaregistrar\EPP\eppContactHandle($adminc,\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_ADMIN));
-            $domain->addContact(new \Metaregistrar\EPP\eppContactHandle($techc,\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_TECH));
-            $domain->addContact(new \Metaregistrar\EPP\eppContactHandle($techc,\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_BILLING));
-            if (is_array($nameservers)) {
-                foreach ($nameservers as $ns) {
-                    if (strlen($ns) > 0) {
-                        if (!filter_var($ns, FILTER_VALIDATE_IP)) {
-                            $domain->addHost(new \Metaregistrar\EPP\eppHost($ns));
-                        }
-                    }
-                }
-            }
-            $domain->setPeriod($period);
-            $domain->setPeriodUnit('y');
-            $domain->setAuthorisationCode($authcode);
-            // Create an EPP transfer request
-            $transfer = new \Metaregistrar\EPP\metaregEppTransferExtendedRequest(\Metaregistrar\EPP\eppTransferRequest::OPERATION_REQUEST,$domain);
-            // Send the EPP request
-            if ($response = $this->conn->request($transfer)) {
-                /* @var $response \Metaregistrar\EPP\eppTransferResponse */
-                // Process the response
-                if (($response->getResultCode()==1000) || ($response->getResultCode()==1001)) {
-                    return true;
-                } else {
-                    $this->Error[] = $response->getResultMessage().' '.$response->getResultReason();
-                    return false;
-                }
-            }
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname;
-        return false;
-    }
-
-    private function mtrupdatecontact($handle, $whois) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // Set the handle to be updated
-            $contacthandle = new \Metaregistrar\EPP\eppContactHandle($handle);
-            // Set the contact parameters for update
-            $postalinfo = new \Metaregistrar\EPP\eppContactPostalInfo($whois->ownerInitials.' '.$whois->ownerSurName, $whois->ownerCity, $whois->ownerCountry, $whois->ownerCompanyName, $whois->ownerAddress, '', $whois->ownerZipCode);
-            if (strlen($whois->ownerFaxNumber) > 0) {
-                $whois->ownerFaxNumber = $whois->CountryCode.'.'.$whois->ownerFaxNumber;
-            }
-            if (strlen($whois->ownerPhoneNumber) > 0) {
-                $whois->ownerPhoneNumber = $whois->CountryCode.'.'.$whois->ownerPhoneNumber;
-            }
-            $contact = new \Metaregistrar\EPP\eppContact($postalinfo, $whois->ownerEmailAddress, $whois->ownerPhoneNumber, $whois->ownerFaxNumber);
-            // Create an EPP update request
-            $update = new \Metaregistrar\EPP\eppUpdateContactRequest($contacthandle, null, null, $contact);
-            // Send the EPP request
-            if ($response = $this->conn->request($update)) {
-                /* @var $response \Metaregistrar\EPP\eppUpdateContactResponse */
-                // Process the response
-                if ($response->getResultCode() == 1000) {
-                    return true;
-                } else {
-                    $this->Error[] = $response->getResultMessage(). ' '.$response->getResultReason();
-                    return false;
-                }
-            }
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'Algemene fout opgetreden bij bijwerken van contact '.$handle;
-        return false;
-    }
-
-    /**
-     * @param $whois
-     * @return bool|string
-     */
-    private function mtrcreatecontact($whois) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // Set the contact parameters
-            $postalinfo = new \Metaregistrar\EPP\eppContactPostalInfo(htmlspecialchars_decode($whois->ownerInitials).' '.htmlspecialchars_decode($whois->ownerSurName), $whois->ownerCity, $whois->ownerCountry, htmlspecialchars_decode($whois->ownerCompanyName), htmlspecialchars_decode($whois->ownerAddress), '', $whois->ownerZipCode);
-            if (strlen($whois->ownerFaxNumber) > 0) {
-                if (strpos($whois->ownerFaxNumber,'+31.')===false) {
-                    $whois->ownerFaxNumber = $whois->CountryCode . '.' . $whois->ownerFaxNumber;
-                }
-            }
-            if (strlen($whois->ownerPhoneNumber) > 0) {
-                if (strpos($whois->ownerPhoneNumber,'+31.')===false) {
-                    $whois->ownerPhoneNumber = $whois->CountryCode.'.'.$whois->ownerPhoneNumber;
-                }
-            }
-            $contact = new \Metaregistrar\EPP\eppContact($postalinfo, $whois->ownerEmailAddress, $whois->ownerPhoneNumber, $whois->ownerFaxNumber);
-            // Create an EPP contact:create request
-            $create = new \Metaregistrar\EPP\eppCreateContactRequest($contact);
-            // Send the request
-            if ($response = $this->conn->request($create)) {
-                /* @var $response \Metaregistrar\EPP\eppCreateContactResponse */
-                // Handle the response
-                if ($response->getResultCode() == 1000) {
-                    return $response->getContactId();
-                } else {
-                    $this->Error[] = $response->getResultMessage(). ' '.$response->getResultReason();
-                    return false;
-                }
-            }
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'Algemene fout opgetreden bij aanmaken nieuw contact';
-        return false;
-    }
-
-
-    /**
-     * Retrieve information on a domain name
-     * @param $domainname
-     * @return array|bool
-     */
-    private function mtrgetdomaininfo($domainname) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // Set the domain to be infoed
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            // Create the EPP domain:info request
-            $request = new \Metaregistrar\EPP\metaregInfoDomainRequest($domain);
-            // Send the EPP request
-            if ($response = $this->conn->request($request)) {
-                /* @var $response \Metaregistrar\EPP\eppDnssecInfoDomainResponse */
-                // Handle the response
-                $info  = [];
-                $info['registrant'] = $response->getDomainRegistrant();
-                $info['admin-c'] = $response->getDomainContact(\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_ADMIN);
-                $info['tech-c'] = $response->getDomainContact(\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_TECH);
-                $info['authcode'] = $response->getDomainAuthInfo();
-                $info['credate'] = $response->getDomainCreateDate();
-                $info['expdate'] = $response->getDomainExpirationDate();
-                $info['autorenew'] = $response->getAutoRenew();
-                $info['nameservers'] = explode(',',$response->getDomainNameserversCSV());
-                return $info;
-            }
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'Algemene fout opgetreden bij opvragen domeinnaam informatie van '.$domainname;
-        return false;
-    }
-
-    /**
-     * Get all contents of a contact object
-     * @param string $handle
-     * @return bool|array
-     */
-    private function mtrgetcontactinfo($handle) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // Set the contact handle to be queried
-            $contact = new \Metaregistrar\EPP\eppContactHandle($handle);
-            // Create an EPP contact:info request
-            $request = new \Metaregistrar\EPP\eppInfoContactRequest($contact);
-            // Send the request
-            if ($response = $this->conn->request($request)) {
-                /* @var $response \Metaregistrar\EPP\eppInfoContactResponse */
-                // Handle the response
-                $info  = [];
-                $postalinfo = $response->getContactPostalInfo();
-                /* @var $postalinfo \Metaregistrar\EPP\eppContactPostalInfo */
-                $info['company'] = $postalinfo[0]->getOrganisationName();
-                $info['name'] = $postalinfo[0]->getName();
-                $info['address'] = $postalinfo[0]->getStreet(0);
-                $info['postcode'] = $postalinfo[0]->getZipcode();
-                $info['city'] = $postalinfo[0]->getCity();
-                $info['countrycode'] = $postalinfo[0]->getCountrycode();
-                $info['phone'] = $response->getContactVoice();
-                $info['fax'] = $response->getContactFax();
-                $info['email'] = $response->getContactEmail();
-                return $info;
-            }
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'Algemene fout opgetreden bij opvragen contact informatie van '.$handle;
-        return false;
-    }
-
-    /**
-     * @param string $domainname
-     * @param bool $autorenew
-     * @return bool
-     */
-    private function mtrupdateautorenew($domainname, $autorenew) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // Set the domain to be updated
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            // Create EPP domain:update request with autorenew extension
-            $update = new \Metaregistrar\EPP\metaregEppAutorenewRequest($domain,$autorenew);
-            // Send the request
-            if ($response = $this->conn->request($update)) {
-                // Handle the response
-                if ($response->getResultCode() == 1000) {
-                    return true;
-                }
-            } else {
-                $this->Error[] = $response->getResultMessage();
-                return false;
-            }
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'Algemene fout opgetreden bij wijzigen nameserver informatie van '.$domainname;
-        return false;
-    }
-
-    /**
-     * Update the nameservers of the domain name. Specify the new set of nameservers as wanted, the system will determine the changes to be made
-     * @param $domainname
-     * @param $nameservers
-     * @return bool
-     */
-    private function mtrupdatenameservers($domainname, $nameservers) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // First get the current nameservers of this domain name
-            $info = $this->mtrgetdomaininfo($domainname);
-            if ($info) {
-                // Process the current nameservers to see if the new ones are already in there
-                $oldns = $info['nameservers'];
-                foreach ($nameservers as $index=>$ns) {
-                    if (in_array($ns,$oldns)) {
-                        // If the new nameservers are already in the current nameservers, nothing has to be removed or added
-                        $ind = array_search($ns,$oldns);
-                        unset($oldns[$ind]);
-                        unset($nameservers[$index]);
-                    }
-                }
-                // Check if we still have nameservers left to add or remove
-                if ((count($nameservers) > 0) || (count($oldns) > 0)) {
-                    $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-                    $add = null;
-                    // There are still nameservers left to add
-                    if (count($nameservers) > 0) {
-                        $add = new \Metaregistrar\EPP\eppDomain($domainname);
-                        foreach ($nameservers as $ns) {
-                            if (strlen($ns) > 0) {
-                                $add->addHost(new \Metaregistrar\EPP\eppHost($ns));
-                            }
-                        }
-                    }
-                    $rem = null;
-                    // There are still nameservers left to be removed
-                    if (count($oldns) > 0) {
-                        $rem = new \Metaregistrar\EPP\eppDomain($domainname);
-                        foreach ($oldns as $ns) {
-                            if (strlen($ns) > 0) {
-                                $rem->addHost(new \Metaregistrar\EPP\eppHost($ns));
-                            }
-                        }
-                    }
-                    // Create the EPP domain:update request
-                    $update = new \Metaregistrar\EPP\eppUpdateDomainRequest($domain, $add, $rem, null);
-                    // Send the request
-                    if ($response = $this->conn->request($update)) {
-                        /* @var $response \Metaregistrar\EPP\eppUpdateDomainResponse */
-                        // Handle the response
-                        if ($response->getResultCode() == 1000) {
-                            return true;
-                        }
-                    }
-                } else {
-                    return true;
-                }
-            } else {
-                return false;
-            }
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'Algemene fout opgetreden bij wijzigen nameserver informatie van '.$domainname;
-        return false;
-    }
-
-    /**
-     * Check if a domain name is free or taken
-     * @param string $domainname
-     * @return bool
-     */
-    private function mtrcheckdomain($domainname) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // The domain name to be checked
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            // Create an EPP domain:check request
-            $check = new \Metaregistrar\EPP\eppCheckDomainRequest($domain);
-            // Send the request
-            if ($response = $this->conn->request($check)) {
-                /* @var $response \Metaregistrar\EPP\eppCheckDomainResponse */
-                // Handle the response
-                $test = $response->getCheckedDomains();
-                return $test[0]['available'];
-            } else {
-                $this->Error[] = 'Error checking domain name '.$domainname;
-                return false;
-            }
-
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-    }
-
-    /**
-     * Cancel a domain name
-     * @param string $domainname
-     * @return bool
-     */
-    private function mtrdeletedomain($domainname) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // Set the domain to be deleted
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            // Create an EPP domain:delete request
-            $delete = new \Metaregistrar\EPP\eppDeleteDomainRequest($domain);
-            // Send the EPP request
-            if ($response = $this->conn->request($delete)) {
-                /* @var $response \Metaregistrar\EPP\eppDeleteResponse */
-                // Handle the response
-                if (($response->getResultCode() == 1000) || ($response->getResultCode() == 1001)) {
-                    return true;
-                }
-            } else {
-                $this->Error[] = 'Error deleting domain name '.$domainname;
-                return false;
-            }
-
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'General error deleting domain name '.$domainname;
-        return false;
-    }
-
-    /**
-     * Put a domain name on clientHold or remove the clientHold
-     * @param $domainname
-     * @param $lock
-     * @return bool
-     */
-    function mtrlockdomain($domainname, $lock) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            // Set the domain name to be locked
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            // Set the lock parameters, which lock to apply
-            $change = new \Metaregistrar\EPP\eppDomain($domainname);
-            $change->addStatus(\Metaregistrar\EPP\eppDomain::STATUS_CLIENT_HOLD);
-            if ($lock) {
-                // Add the lock status
-                $update = new \Metaregistrar\EPP\eppUpdateDomainRequest($domain,$change,null,null);
-            } else {
-                // Remove the lock status
-                $update = new \Metaregistrar\EPP\eppUpdateDomainRequest($domain, null,$change,null);
-            }
-            // Send the EPP request
-            if ($response = $this->conn->request($update)) {
-                /* @var $response \Metaregistrar\EPP\eppUpdateDomainResponse */
-                // Handle the response
-                if (($response->getResultCode() == 1000) || ($response->getResultCode() == 1001)) {
-                    return true;
-                }
-            } else {
-                $this->Error[] = 'Error locking domain name '.$domainname;
-                return false;
-            }
-
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-        $this->Error[] = 'General error occurred locking domain name '.$domainname;
-        return false;
-    }
-
-
-    /**
-     * Get all DNS records for a specific domain name
-     * @param string $domainname
-     * @return array|bool
-     */
-    function mtrgetdnszone($domainname) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            $request = new \Metaregistrar\EPP\metaregInfoDnsRequest($domain);
-            if ($response = $this->conn->request($request)) {
-                /* @var $response \Metaregistrar\EPP\metaregInfoDnsResponse */
-                $content = $response->getContent();
-                return $content;
-            } else {
-                $this->Error[] = 'Error retrieving DNS for '.$domainname;
-                return false;
-            }
-
-        } catch (Metaregistrar\EPP\eppException $e) {
-            if ($e->getCode()==2303) {
-                $this->mtrcreatednszone($domainname);
-                $this->Error[] = "Er waren nog geen DNS gegevens bekend voor deze domeinnaam. De zone is nu aangemaakt, klik opnieuw op 'DNS beheer' om deze te bewerken";
-                return false;
-            } else {
-                $this->Error[] = $e->getMessage();
-                return false;
-            }
-        }
-    }
-
-    function mtrcreatednszone($domainname) {
-        if (!$this->loggedin) {
-            if (!$this->login()) {
-                return false;
-            }
-        }
-        try {
-            $domain = new \Metaregistrar\EPP\eppDomain($domainname);
-            $records = [];
-            $records[] = ['type' => 'NS', 'name' => $domainname, 'content' => 'ns1.yourdomainprovider.net', 'ttl' => 3600];
-            $records[] = ['type' => 'NS', 'name' => $domainname, 'content' => 'ns2.yourdomainprovider.net', 'ttl' => 3600];
-            $records[] = ['type' => 'NS', 'name' => $domainname, 'content' => 'ns3.yourdomainprovider.net', 'ttl' => 3600];
-            $request = new \Metaregistrar\EPP\metaregCreateDnsRequest($domain,$records);
-            if ($response = $this->conn->request($request)) {
-                /* @var $response \Metaregistrar\EPP\metaregInfoDnsResponse */
-                return true;
-            } else {
-                $this->Error[] = 'Error retrieving DNS for '.$domainname;
-                return false;
-            }
-
-        } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-    }
-
-
-    /**
-     * Update the DNS information, add and remove records in the DNS
-     * @param string $domainname
-     * @param array $adds
-     * @param array $dels
-     * @return bool
-     */
-    private function mtrupdatednszone($domainname, $adds, $dels) {
-        try {
-            $domain = new Metaregistrar\EPP\eppDomain($domainname);
-            if (count($adds) == 0) {
-                $adds = null;
-            }
-            if (count($dels) == 0) {
-                $dels = null;
-            }
-            $update= new Metaregistrar\EPP\metaregUpdateDnsRequest($domain,$adds,$dels,null);
-            $this->Success[] = $update->saveXML();
-            if ($response = $this->conn->request($update)) {
-                if ($response->getResultCode()==1000) {
-                    return true;
-                } else {
-                    $this->Error[] = $response->getResultMessage();
-                    return false;
-                }
-            } else {
-                $this->Error[] = "Error updating DNS";
-                return false;
-            }
-        } catch (\Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
-            return false;
-        }
-
     }
 
     /*
      *
      * STANDARD Wefact functions
      * These functions come with the standard Wefact implemenation and call the metaregistrar functions where applicable
-     *
-     *
-     *
-     *
-     *
      */
 
     /**
@@ -743,26 +66,11 @@ class metaregistrar implements IRegistrar
      * @return 	boolean 			True if free, False if not free, False and $this->Error[] in case of error.
      */
     function checkDomain($domain) {
-        return $this->mtrcheckdomain($domain);
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
+        return $this->mtr->checkdomain($domain);
     }
-
-
-//		/**
-//		 * EXAMPLE IF A FUNCTION IS NOT SUPPORTED
-//		 * Check whether a domain is already registered or not.
-//		 *
-//		 * @param 	string	 $domain	The name of the domain that needs to be checked.
-//		 * @return 	boolean 			True if free, False if not free, False and $this->Error[] in case of error.
-//		 */
-//		function checkDomain($domain) {
-//			$this->Warning[] = 'Metaregistrar:  checking availability for domain '.$domain.' cannot be checked via the API.';
-//
-//			if($this->caller == 'register'){
-//				return true;
-//			}elseif($this->caller == 'transfer'){
-//				return false;
-//			}
-//		}
 
 
     /**
@@ -774,14 +82,12 @@ class metaregistrar implements IRegistrar
      * @return 	bool					True on success; False otherwise.
      */
     function registerDomain($domain, $nameservers = array(), $whois = null) {
-
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         /** if you use DNS management, the following variables are also available
          * $this->DNSTemplateID
          * $this->DNSTemplateName
-         */
-
-        /**
-         * Step 1) obtain an owner handle
          */
         $ownerHandle = "";
         // Check if a registrar-specific ownerhandle for this domain already exists.
@@ -813,9 +119,6 @@ class metaregistrar implements IRegistrar
             return false;
         }
 
-        /**
-         * Step 2) obtain an admin handle
-         */
         $adminHandle = "";
         // Check if a registrar-specific adminhandle for this domain already exists.
         if (isset($whois->adminRegistrarHandles[$this->ClassName]))
@@ -846,9 +149,6 @@ class metaregistrar implements IRegistrar
             return false;
         }
 
-        /**
-         * Step 3) obtain a tech handle
-         */
         $techHandle = "";
         // Check if a registrar-specific techhandle for this domain already exists.
         if (isset($whois->techRegistrarHandles[$this->ClassName]))
@@ -879,9 +179,6 @@ class metaregistrar implements IRegistrar
             return false;
         }
 
-        /**
-         * Step 4) obtain nameserver handles
-         */
         // If your system uses nameserver groups or handles, you can check the $nameserver array and match these hostnames with your own system.
         $requestns = [];
         foreach ($nameservers as $index=>$ns) {
@@ -890,22 +187,13 @@ class metaregistrar implements IRegistrar
                 $requestns[] = $ns;
             }
         }
-        /**
-         * Step 5) check your own default settings
-         */
         // Determine period for registration in years, based on your TLD properties.
         // $this->Period is also used in WeFact, for determining the renewal date.
         $this->Period = 1;
 
-        /**
-         * Step 6) register domain
-         */
         // Start registering the domain, you can use $domain, $ownerHandle, $adminHandle, $techHandle, $nameservers
-        $response = $this->mtrcreatedomain($domain, $ownerHandle, $adminHandle, $techHandle, $requestns, $this->Period, $this->generateauth());
+        $response = $this->mtr->createdomain($domain, $ownerHandle, $adminHandle, $techHandle, $requestns, $this->Period, $this->generateauth());
 
-        /**
-         * Step 7) provide feedback to WeFact
-         */
         return $response;
     }
 
@@ -918,15 +206,14 @@ class metaregistrar implements IRegistrar
      * @return 	bool					True on success; False otherwise;
      */
     function transferDomain($domain, $nameservers = array(), $whois = null, $authcode = "") {
-
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         /** if you use DNS management, the following variables are also available
          * $this->DNSTemplateID
          * $this->DNSTemplateName
          */
 
-        /**
-         * Step 1) obtain an owner handle
-         */
         $ownerHandle = "";
         // Check if a registrar-specific ownerhandle for this domain already exists.
         if (isset($whois->ownerRegistrarHandles[$this->ClassName]))
@@ -957,9 +244,6 @@ class metaregistrar implements IRegistrar
             return false;
         }
 
-        /**
-         * Step 2) obtain an admin handle
-         */
         $adminHandle = "";
         // Check if a registrar-specific adminhandle for this domain already exists.
         if (isset($whois->adminRegistrarHandles[$this->ClassName]))
@@ -990,9 +274,6 @@ class metaregistrar implements IRegistrar
             return false;
         }
 
-        /**
-         * Step 3) obtain a tech handle
-         */
         $techHandle = "";
         // Check if a registrar-specific techhandle for this domain already exists.
         if (isset($whois->techRegistrarHandles[$this->ClassName]))
@@ -1023,27 +304,15 @@ class metaregistrar implements IRegistrar
             return false;
         }
 
-        /**
-         * Step 4) obtain nameserver handles
-         */
         // If your system uses nameserver groups or handles, you can check the $nameserver array and match these hostnames with your own system.
 
-        /**
-         * Step 5) check your own default settings
-         */
         // Determine period for transfer in years, based on your TLD properties.
         // $this->Period is also used in WeFact, for determining the renewal date.
         $this->Period = 1;
 
-        /**
-         * Step 6) transfer domain
-         */
         // Start transferring the domain, you can use $domain, $ownerHandle, $adminHandle, $techHandle, $nameservers, $authcode
-        $response = $this->mtrtransferdomain($domain, $ownerHandle, $adminHandle, $techHandle, $nameservers, $this->Period, $authcode);
+        $response = $this->mtr->transferdomain($domain, $ownerHandle, $adminHandle, $techHandle, $nameservers, $this->Period, $authcode);
 
-        /**
-         * Step 7) provide feedback to WeFact
-         */
         return $response;
     }
 
@@ -1055,15 +324,14 @@ class metaregistrar implements IRegistrar
      * @return	bool				True if the domain was succesfully removed; False otherwise;
      */
     function deleteDomain($domain, $delType = 'end') {
-
-        if($delType == "end"){
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
+        if ($delType == "end"){
             return $this->setDomainAutoRenew($domain, false);
         } else {
-            /**
-             * Step 1) delete domain
-             */
             // Delete the domain, you can use $domain
-            return $this->mtrdeletedomain($domain);
+            return $this->mtr->deletedomain($domain);
         }
     }
 
@@ -1075,8 +343,10 @@ class metaregistrar implements IRegistrar
      * @return	array|bool			The array containing all information about the given domain
      */
     function getDomainInformation($domain) {
-
-        if($info= $this->mtrgetdomaininfo($domain)) {
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
+        if($info= $this->mtr->getdomaininfo($domain)) {
             $whois = new whois();
             $whois->ownerHandle = $info['registrant'];
             $whois->adminHandle = $info['admin-c'];
@@ -1106,6 +376,9 @@ class metaregistrar implements IRegistrar
      * @return	bool|array					A list of all domains available in the system.
      */
     function getDomainList($contactHandle = "") {
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         if (!is_file(dirname(__FILE__).'/import/domeinnamen.csv')) {
             $this->Error[] = "File 'domeinnamen.csv' niet gevonden. Plaats een bestand met domeinnamen in de map 'import' en noem dit bestand 'domeinnamen.csv'";
             return false;
@@ -1128,7 +401,7 @@ class metaregistrar implements IRegistrar
 
             // Loop for all domains:
             foreach ($domains as $domain) {
-                $info = $this->mtrgetdomaininfo($domain);
+                $info = $this->mtr->getdomaininfo($domain);
                 if ($info) {
                     $whois = new whois();
                     $whois->ownerHandle = $info['registrant'];
@@ -1165,11 +438,10 @@ class metaregistrar implements IRegistrar
      * @return	bool				True is the lock state was changed succesfully
      */
     function lockDomain($domain, $lock = true) {
-        /**
-         * Step 1) (un)lock domain
-         */
-        // (un)lock the domain, you can use $domain and $lock
-        return $this->mtrlockdomain($domain, $lock);
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
+        return $this->mtr->lockdomain($domain, $lock);
     }
 
     /**
@@ -1180,14 +452,10 @@ class metaregistrar implements IRegistrar
      * @return	bool					True when the setting is succesfully changed; False otherwise
      */
     function setDomainAutoRenew($domain, $autorenew = true) {
-        /**
-         * Step 1) change autorenew for domain
-         */
-        // change autorenew for the domain, you can use $domain and $autorenew
-        /**
-         * Step 2) provide feedback to WeFact
-         */
-        return $this->mtrupdateautorenew($domain, $autorenew);
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
+        return $this->mtr->updateautorenew($domain, $autorenew);
     }
 
     /**
@@ -1197,10 +465,10 @@ class metaregistrar implements IRegistrar
      * @return
      */
     public function getToken($domain){
-        /**
-         * Step 1) get EPP code/token
-         */
-        $response 	= $this->mtrgetdomaininfo($domain);
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
+        $response 	= $this->mtr->getdomaininfo($domain);
 
         /**
          * Step 2) provide feedback to WeFact
@@ -1225,7 +493,9 @@ class metaregistrar implements IRegistrar
      * @return mixed $list_domains
      */
     public function getSyncData($list_domains) {
-
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         /**
          * There are two scenario's for retrieving the information
          * 1. Get the domain list which provide sufficient information for this function
@@ -1246,7 +516,7 @@ class metaregistrar implements IRegistrar
         {
             // Ask registrar for information of domain
             $response = array(); // Array with domain information
-            $info = $this->mtrgetdomaininfo($domain_name);
+            $info = $this->mtr->getdomaininfo($domain_name);
             if(!$info)
             {
                 $list_domains[$domain_name]['Status']    = 'error';
@@ -1290,27 +560,6 @@ class metaregistrar implements IRegistrar
     function updateDomainWhois($domain, $whois){
         $this->Error[] = 'Contact bijwerken via WHOIS optie wordt niet ondersteund, bewerk het contact en vink "updaten bij registrar" aan om de whois gegevens van het contact bij te werken';
         return false;
-        /**
-         * Step 1) update WHOIS data for domain.
-         */
-        // update owner WHOIS for the domain, you can use $domain and $whois
-        $response 	= true;
-        $error_msg 	= '';
-
-        /**
-         * Step 2) provide feedback to WeFact
-         */
-        if($response === true)
-        {
-            // update is succesfull
-            return true;
-        }
-        else
-        {
-            // update failed
-            $this->Error[] 	= sprintf("Metaregistrar: Fout bij wijzigen contactinformatie van '%s': %s", $domain, $error_msg);
-            return false;
-        }
     }
 
     /**
@@ -1320,13 +569,10 @@ class metaregistrar implements IRegistrar
      * @return array|bool with handles
      */
     function getDomainWhois($domain) {
-        /**
-         * Step 1) get handles for WHOIS contacts
-         */
-        $info = $this->mtrgetdomaininfo($domain);
-        /**
-         * Step 2) provide feedback to WeFact
-         */
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
+        $info = $this->mtr->getdomaininfo($domain);
         if ($info) {
             $contacts = [];
             $contacts['ownerHandle'] 	= $info['registrant'];
@@ -1334,7 +580,6 @@ class metaregistrar implements IRegistrar
             $contacts['techHandle'] 	= $info['tech-c'];
             return $contacts;
         }
-
         return false;
     }
 
@@ -1346,7 +591,9 @@ class metaregistrar implements IRegistrar
      * @return	bool					Handle when the new contact was created succesfully; False otherwise.
      */
     function createContact($whois, $type = HANDLE_OWNER) {
-
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         // Determine which contact type should be found
         switch($type) {
             case HANDLE_OWNER:	$prefix = "owner"; 	break;
@@ -1360,23 +607,12 @@ class metaregistrar implements IRegistrar
         $whois->getParam($prefix,'StreetName');		// Not only Address, but also StreetName, StreetNumber and StreetNumberAddon are available after calling this function.
         $whois->getParam($prefix,'CountryCode');	// Phone and faxnumber are split. CountryCode, PhoneNumber and FaxNumber available. CountryCode contains for example '+31'. PhoneNumber contains number without leading zero e.g. '123456789'.
 
-        /**
-         * Step 1) Create the contact
-         */
         // Create the contact
-        $handle 	= $this->mtrcreatecontact($whois);
-
-        /**
-         * Step 2) provide feedback to WeFact
-         */
-        if($handle)
-        {
-            // A handle is created
+        $handle 	= $this->mtr->createcontact($whois);
+        if ($handle) {
             return $handle;
         }
-        else
-        {
-            // Creating handle failed
+        else {
             return false;
         }
     }
@@ -1390,6 +626,9 @@ class metaregistrar implements IRegistrar
      * @return
      */
     function updateContact($handle, $whois, $type = HANDLE_OWNER) {
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         // Determine which contact type should be found
         switch($type) {
             case HANDLE_OWNER:	$prefix = "owner"; 	break;
@@ -1412,7 +651,7 @@ class metaregistrar implements IRegistrar
         // e.g.
         // $whois->ownerSurName			To obtain surname of domain owner
         // $whois->adminPhoneNumber   	To obtain phone number of admin contact data
-        return $this->mtrupdatecontact($handle, $whois);
+        return $this->mtr->updatecontact($handle, $whois);
     }
 
     /**
@@ -1422,11 +661,14 @@ class metaregistrar implements IRegistrar
      * @return array Information available about the requested contact.
      */
     function getContact($handle) {
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         /**
          * Step 1) Create the contact
          */
         // Create the contact
-        $response 	= $this->mtrgetcontactinfo($handle);
+        $response 	= $this->mtr->getcontactinfo($handle);
         $whois 		= new whois();
 
         /**
@@ -1465,6 +707,9 @@ class metaregistrar implements IRegistrar
      * @return string handle of the requested contact; False if the contact could not be found.
      */
     function getContactHandle($whois = array(), $type = HANDLE_OWNER) {
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         // Function to search contact by whois data is not supported
         $this->Error[] = 'Zoeken van contactinformatie via de whois wordt niet ondersteund door de Metaregistrar API';
         return false;
@@ -1505,6 +750,9 @@ class metaregistrar implements IRegistrar
      * @return array List of all contact matching the $surname search criteria.
      */
     function getContactList($surname = "") {
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         if (!is_file(dirname(__FILE__).'/import/contacten.csv')) {
             $this->Error[] = "Bestand 'contacten.csv' niet gevonden. Plaats een bestand met contact ID's in de map 'import' en noem dit bestand 'contacten.csv'";
             return false;
@@ -1517,7 +765,7 @@ class metaregistrar implements IRegistrar
         $contacts = file(dirname(__FILE__).'/import/contacten.csv',FILE_IGNORE_NEW_LINES);
         if ((is_array($contacts)) && (count($contacts)>0)) {
             foreach ($contacts as $contact) {
-                $info = $this->mtrgetcontactinfo($contact);
+                $info = $this->mtr->getcontactinfo($contact);
                 $contact_list[] = [
                     "Identifier"    => $contact,
                     "Handle" 		=> $contact,
@@ -1559,20 +807,17 @@ class metaregistrar implements IRegistrar
      * @return bool True if the update was succesfull; False otherwise;
      */
     function updateNameServers($domain, $nameservers = array()) {
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         // TODO: check hostnames and create Glue records when hostnames are not there and domainname matches hostname
-        /**
-         * Step 1) update nameservers for domain
-         */
         // Remove the IP addresses from the nameservers array
         foreach ($nameservers as $index=>$nameserver) {
             if (($index == 'ns1ip') || ($index == 'ns2ip') || ($index == 'ns3ip')) {
                 unset($nameservers[$index]);
             }
         }
-        $response = $this->mtrupdatenameservers($domain, $nameservers);
-        /**
-         * Step 2) provide feedback to WeFact
-         */
+        $response = $this->mtr->updatenameservers($domain, $nameservers);
         return $response;
     }
 
@@ -1583,14 +828,8 @@ class metaregistrar implements IRegistrar
      * @return array List of all DNS templates
      */
     function getDNSTemplates() {
-        /**
-         * Step 1) get all DNS templates
-         */
-        $response 	= false;
 
-        /**
-         * Step 2) provide feedback to WeFact
-         */
+        $response 	= false;
         if($response === true)
         {
             $dns_templates = array();
@@ -1617,15 +856,10 @@ class metaregistrar implements IRegistrar
      * @return array Array with DNS zone info and DNS records
      */
     function getDNSZone($domain) {
-
-        /**
-         * Step 1) get DNS zone
-         */
-        $response 	= $this->mtrgetdnszone($domain);
-
-        /**
-         * Step 2) provide feedback to WeFact
-         */
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
+        $response 	= $this->mtr->getdnszone($domain);
         if($response) {
             $i = 0;
             $dns_zone = array();
@@ -1663,7 +897,9 @@ class metaregistrar implements IRegistrar
      * @return array Array with DNS zone info & DNS records
      */
     function saveDNSZone($domain, $dns_zone) {
-
+        if (!$this->mtr) {
+            $this->mtr = new mtr($this->User, $this->Password);
+        }
         /*
         if the registrar does not support a update command, but only add/delete commands
         use the getDNSZone command and compare it's output with the $dns_zone array
@@ -1673,9 +909,6 @@ class metaregistrar implements IRegistrar
         $adds = [];
         $dels = [];
 
-        /**
-         * Step 1) update DNS zone at registrar
-         */
         foreach ($oldzone['records'] as $record) {
             if ((isset($record['priority'])) && ($record['priority']>0)) {
                 $dels[] = ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['value'], 'ttl' => $record['ttl'], 'priority' => $record['priority']];
@@ -1695,11 +928,7 @@ class metaregistrar implements IRegistrar
             }
         }
 
-
-        /**
-         * Step 2) provide feedback to WeFact
-         */
-        return $this->mtrupdatednszone($domain, $adds, $dels);
+        return $this->mtr->updatednszone($domain, $adds, $dels);
 
 
     }
@@ -2041,7 +1270,7 @@ class metaregistrar implements IRegistrar
      * @return array()
      */
     static function getVersionInformation() {
-        require_once("3rdparty/domain/metaregistrar/version.php");
+        require_once(dirname(__FILE__)."/version.php");
         return $version;
     }
 
