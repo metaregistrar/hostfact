@@ -17,12 +17,12 @@ class mtr {
      */
     private $loggedin;
     
-    function __construct($username, $password){
+    function __construct($username, $password) {
         $this->username = $username;
         $this->password = $password;
     }
     
-    function __destruct(){
+    function __destruct() {
         
     }
 
