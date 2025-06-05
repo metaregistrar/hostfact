@@ -15,6 +15,7 @@ require_once("3rdparty/domain/metaregistrar/autoloader.php");
  * -------------------------------------------------------------------------------------
  *  2017-08-18		E.W. de Graaf 		Initial version
  *  2017-08-23      E.W. de Graaf       Added DNS management
+ *  2025-06-01      E.W. de Graaf       Small fixes, up-to-date with php 8.x
  * -------------------------------------------------------------------------------------
  */
 
@@ -46,15 +47,11 @@ class metaregistrar implements IRegistrar
      * metaregistrar constructor.
      */
     function __construct(){
-
         $this->ClassName = __CLASS__;
-
         $this->Error = array();
         $this->Warning = array();
         $this->Success = array();
         return true;
-
-
     }
 
     /**
@@ -70,11 +67,6 @@ class metaregistrar implements IRegistrar
      *
      * METAREGISTRAR CONNECTION FUNCTIONS
      * These functions make use of https://github.com/metaregistrar/php-epp-client for EPP connection
-     *
-     *
-     *
-     *
-     *
      */
 
     /**
@@ -1533,7 +1525,9 @@ class metaregistrar implements IRegistrar
         if ((is_array($contacts)) && (count($contacts)>0)) {
             foreach ($contacts as $contact) {
                 $info = $this->mtrgetcontactinfo($contact);
-                $contact_list[] = ["Handle" 		=> $contact,
+                $contact_list[] = [
+                    "Identifier"    => $contact,
+                    "Handle" 		=> $contact,
                     "CompanyName"	=> $info['company'],
                     "Initials"		=> "",
                     "SurName" 		=> $info['name'],
