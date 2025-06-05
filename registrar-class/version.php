@@ -1,7 +1,7 @@
 <?php
-$version['name']            = "YourName";
-$version['api_version']     = "YourAPIVersion";
-$version['date']            = "2016-01-01"; // Last modification date
+$version['name']            = "Metaregistrar";
+$version['api_version']     = "Latest";
+$version['date']            = "2025-06-01"; // Last modification date
 $version['version']         = "3.6"; // Version released for HostFact
 $version['autorenew']       = true; // AutoRenew is default?  true | false
 $version['handle_support']  = true; // Handles are supported? true | false
