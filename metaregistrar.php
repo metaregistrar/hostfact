@@ -338,10 +338,10 @@ class metaregistrar implements IRegistrar
             // Set the domain to be infoed
             $domain = new \Metaregistrar\EPP\eppDomain($domainname);
             // Create the EPP domain:info request
-            $request = new \Metaregistrar\EPP\eppInfoDomainRequest($domain);
+            $request = new \Metaregistrar\EPP\metaregInfoDomainRequest($domain);
             // Send the EPP request
             if ($response = $this->conn->request($request)) {
-                /* @var $response \Metaregistrar\EPP\eppInfoDomainResponse */
+                /* @var $response \Metaregistrar\EPP\eppDnssecInfoDomainResponse */
                 // Handle the response
                 $info  = [];
                 $info['registrant'] = $response->getDomainRegistrant();
@@ -350,6 +350,7 @@ class metaregistrar implements IRegistrar
                 $info['authcode'] = $response->getDomainAuthInfo();
                 $info['credate'] = $response->getDomainCreateDate();
                 $info['expdate'] = $response->getDomainExpirationDate();
+                $info['autorenew'] = $response->getAutoRenew();
                 $info['nameservers'] = explode(',',$response->getDomainNameserversCSV());
                 return $info;
             }
@@ -1075,14 +1076,6 @@ class metaregistrar implements IRegistrar
      */
     function getDomainInformation($domain) {
 
-        /**
-         * Step 1) query domain
-         */
-        // Query the domain, you can use $domain
-
-        /**
-         * Step 2) provide feedback to WeFact
-         */
         if($info= $this->mtrgetdomaininfo($domain)) {
             $whois = new whois();
             $whois->ownerHandle = $info['registrant'];
@@ -1093,8 +1086,9 @@ class metaregistrar implements IRegistrar
             $response = array(	"Domain" => $domain,
                 "Information" => array(	"nameservers" => $info['nameservers'],
                     "whois" => $whois, // Whois object
-                    "expiration_date" => $info['expdate'],  // Empty or date in yyyy-mm-dd
-                    "registration_date" => $info['regdate'],  // Empty or date in yyyy-mm-dd
+                    "expiration_date" => $info['expdate'],
+                    "registration_date" => $info['regdate'],
+                    "auto_renew" => ($info['autorenew'] ? 'on' : 'off'),
                     "authkey" => $info['authcode']));
             return $response;
         }
@@ -1264,14 +1258,13 @@ class metaregistrar implements IRegistrar
             $nameservers_array  = $info['nameservers'];
             $expirationdate     = date('Y-m-d',strtotime($info['expdate']));
             $registrationdate   = date('Y-m-d',strtotime($info['regdate']));
-            $auto_renew         = 'on'; // or 'off'
+            $auto_renew         = $info['autorenew'];
 
             // extend the list_domains array with data from the registrar
             $list_domains[$domain_name]['Information']['nameservers']        = $nameservers_array;
             $list_domains[$domain_name]['Information']['expiration_date']    = (isset($expirationdate)) ? $expirationdate : '';
             $list_domains[$domain_name]['Information']['registration_date']  = (isset($registrationdate)) ? $registrationdate : '';
-            $list_domains[$domain_name]['Information']['auto_renew']         = (isset($auto_renew)) ? $auto_renew : '';
-
+            $list_domains[$domain_name]['Information']['auto_renew']         = ($auto_renew ? 'on' : 'off');
             $list_domains[$domain_name]['Status'] = 'success';
 
             // Increment counter
