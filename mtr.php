@@ -5,6 +5,7 @@ class mtr {
 
     private $username;
     private $password;
+    private $testmode;
     
     /**
      * The connection to Metaregistrar EPP
@@ -17,9 +18,10 @@ class mtr {
      */
     private $loggedin;
     
-    function __construct($username, $password) {
+    function __construct($username, $password, $testmode = false) {
         $this->username = $username;
         $this->password = $password;
+        $this->testmode = $testmode;
     }
     
     function __destruct() {
@@ -38,7 +40,12 @@ class mtr {
         try {
             $this->conn = new Metaregistrar\EPP\metaregEppConnection();
             // Set parameters
-            $this->conn->setHostname('ssl://eppl.metaregistrar.com');
+            if ($this->testmode) {
+                $this->conn->setHostname('ssl://epp-ote.metaregistrar.com');
+            } else {
+                $this->conn->setHostname('ssl://epp.metaregistrar.com');
+            }
+
             $this->conn->setPort(7000);
             $this->conn->setUsername($this->username);
             $this->conn->setPassword($this->password);

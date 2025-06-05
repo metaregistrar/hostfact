@@ -23,6 +23,7 @@ class metaregistrar implements IRegistrar
 {
     public $User;
     public $Password;
+    public $Testmode;
 
     public $Error;
     public $Warning;
@@ -67,7 +68,7 @@ class metaregistrar implements IRegistrar
      */
     function checkDomain($domain) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         return $this->mtr->checkdomain($domain);
     }
@@ -83,7 +84,7 @@ class metaregistrar implements IRegistrar
      */
     function registerDomain($domain, $nameservers = array(), $whois = null) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         /** if you use DNS management, the following variables are also available
          * $this->DNSTemplateID
@@ -91,19 +92,15 @@ class metaregistrar implements IRegistrar
          */
         $ownerHandle = "";
         // Check if a registrar-specific ownerhandle for this domain already exists.
-        if (isset($whois->ownerRegistrarHandles[$this->ClassName]))
-        {
+        if (isset($whois->ownerRegistrarHandles[$this->ClassName])) {
             $ownerHandle = $whois->ownerRegistrarHandles[$this->ClassName];
         }
         // If not, check if WHOIS-data for owner contact is available to search or create new handle
-        elseif($whois->ownerSurName != "")
-        {
+        elseif($whois->ownerSurName != "") {
             // Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
-            //$ownerHandle = $this->getContactHandle($whois, HANDLE_OWNER);
-
+            $ownerHandle = $this->getContactHandle($whois, HANDLE_OWNER);
             // If no existing handle is found, create new handle
-            if ($ownerHandle == "")
-            {
+            if ($ownerHandle == "") {
                 // Try to create new handle. In case of failure, quit function
                 if(!$ownerHandle = $this->createContact($whois, HANDLE_OWNER))
                 {
@@ -121,19 +118,16 @@ class metaregistrar implements IRegistrar
 
         $adminHandle = "";
         // Check if a registrar-specific adminhandle for this domain already exists.
-        if (isset($whois->adminRegistrarHandles[$this->ClassName]))
-        {
+        if (isset($whois->adminRegistrarHandles[$this->ClassName])) {
             $adminHandle = $whois->adminRegistrarHandles[$this->ClassName];
         }
         // If not, check if WHOIS-data for admin contact is available to search or create new handle
-        elseif($whois->adminSurName != "")
-        {
+        elseif($whois->adminSurName != "") {
             // Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
             //$adminHandle = $this->getContactHandle($whois, HANDLE_ADMIN);
 
             // If no existing handle is found, create new handle
-            if ($adminHandle == "")
-            {
+            if ($adminHandle == "") {
                 // Try to create new handle. In case of failure, quit function
                 if(!$adminHandle = $this->createContact($whois, HANDLE_ADMIN))
                 {
@@ -151,8 +145,7 @@ class metaregistrar implements IRegistrar
 
         $techHandle = "";
         // Check if a registrar-specific techhandle for this domain already exists.
-        if (isset($whois->techRegistrarHandles[$this->ClassName]))
-        {
+        if (isset($whois->techRegistrarHandles[$this->ClassName])) {
             $techHandle = $whois->techRegistrarHandles[$this->ClassName];
         }
         // If not, check if WHOIS-data for tech contact is available to search or create new handle
@@ -207,7 +200,7 @@ class metaregistrar implements IRegistrar
      */
     function transferDomain($domain, $nameservers = array(), $whois = null, $authcode = "") {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         /** if you use DNS management, the following variables are also available
          * $this->DNSTemplateID
@@ -325,7 +318,7 @@ class metaregistrar implements IRegistrar
      */
     function deleteDomain($domain, $delType = 'end') {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         if ($delType == "end"){
             return $this->setDomainAutoRenew($domain, false);
@@ -344,7 +337,7 @@ class metaregistrar implements IRegistrar
      */
     function getDomainInformation($domain) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         if($info= $this->mtr->getdomaininfo($domain)) {
             $whois = new whois();
@@ -377,7 +370,7 @@ class metaregistrar implements IRegistrar
      */
     function getDomainList($contactHandle = "") {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         if (!is_file(dirname(__FILE__).'/import/domeinnamen.csv')) {
             $this->Error[] = "File 'domeinnamen.csv' niet gevonden. Plaats een bestand met domeinnamen in de map 'import' en noem dit bestand 'domeinnamen.csv'";
@@ -439,7 +432,7 @@ class metaregistrar implements IRegistrar
      */
     function lockDomain($domain, $lock = true) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         return $this->mtr->lockdomain($domain, $lock);
     }
@@ -453,7 +446,7 @@ class metaregistrar implements IRegistrar
      */
     function setDomainAutoRenew($domain, $autorenew = true) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         return $this->mtr->updateautorenew($domain, $autorenew);
     }
@@ -466,7 +459,7 @@ class metaregistrar implements IRegistrar
      */
     public function getToken($domain){
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         $response 	= $this->mtr->getdomaininfo($domain);
 
@@ -494,7 +487,7 @@ class metaregistrar implements IRegistrar
      */
     public function getSyncData($list_domains) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         /**
          * There are two scenario's for retrieving the information
@@ -570,7 +563,7 @@ class metaregistrar implements IRegistrar
      */
     function getDomainWhois($domain) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         $info = $this->mtr->getdomaininfo($domain);
         if ($info) {
@@ -592,7 +585,7 @@ class metaregistrar implements IRegistrar
      */
     function createContact($whois, $type = HANDLE_OWNER) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         // Determine which contact type should be found
         switch($type) {
@@ -627,7 +620,7 @@ class metaregistrar implements IRegistrar
      */
     function updateContact($handle, $whois, $type = HANDLE_OWNER) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         // Determine which contact type should be found
         switch($type) {
@@ -662,7 +655,7 @@ class metaregistrar implements IRegistrar
      */
     function getContact($handle) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         /**
          * Step 1) Create the contact
@@ -708,7 +701,7 @@ class metaregistrar implements IRegistrar
      */
     function getContactHandle($whois = array(), $type = HANDLE_OWNER) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         // Function to search contact by whois data is not supported
         $this->Error[] = 'Zoeken van contactinformatie via de whois wordt niet ondersteund door de Metaregistrar API';
@@ -751,7 +744,7 @@ class metaregistrar implements IRegistrar
      */
     function getContactList($surname = "") {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         if (!is_file(dirname(__FILE__).'/import/contacten.csv')) {
             $this->Error[] = "Bestand 'contacten.csv' niet gevonden. Plaats een bestand met contact ID's in de map 'import' en noem dit bestand 'contacten.csv'";
@@ -808,7 +801,7 @@ class metaregistrar implements IRegistrar
      */
     function updateNameServers($domain, $nameservers = array()) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         // TODO: check hostnames and create Glue records when hostnames are not there and domainname matches hostname
         // Remove the IP addresses from the nameservers array
@@ -857,7 +850,7 @@ class metaregistrar implements IRegistrar
      */
     function getDNSZone($domain) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         $response 	= $this->mtr->getdnszone($domain);
         if($response) {
@@ -898,7 +891,7 @@ class metaregistrar implements IRegistrar
      */
     function saveDNSZone($domain, $dns_zone) {
         if (!$this->mtr) {
-            $this->mtr = new mtr($this->User, $this->Password);
+            $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         /*
         if the registrar does not support a update command, but only add/delete commands
