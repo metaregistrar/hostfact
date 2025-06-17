@@ -319,7 +319,7 @@ class mtr {
             // Send the EPP request
             if ($response = $this->conn->request($request)) {
                 if ($response->getResultCode() == 1000) {
-                    /* @var $response \Metaregistrar\EPP\eppDnssecInfoDomainResponse */
+                    /* @var $response \Metaregistrar\EPP\metaregInfoDomainResponse */
                     // Handle the response
                     $info  = [];
                     $info['registrant'] = $response->getDomainRegistrant();
