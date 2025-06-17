@@ -25,9 +25,9 @@ class metaregistrar implements IRegistrar
     public $Password;
     public $Testmode;
 
-    public $Error;
-    public $Warning;
-    public $Success;
+    public $Error = [];
+    public $Warning = [];
+    public $Success = [];
 
     public $Period = 1;
     public $registrarHandles = array();
@@ -41,9 +41,9 @@ class metaregistrar implements IRegistrar
      */
     function __construct() {
         $this->ClassName = __CLASS__;
-        $this->Error = array();
-        $this->Warning = array();
-        $this->Success = array();
+        //$this->Error = array();
+        //$this->Warning = array();
+        //$this->Success = array();
         return true;
     }
 
@@ -70,7 +70,9 @@ class metaregistrar implements IRegistrar
         if (!$this->mtr) {
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
-        return $this->mtr->checkdomain($domain);
+        $result = $this->mtr->checkdomain($domain);
+        if ($this->ErrorsOccurred()) return false;
+        return $result;
     }
 
 
@@ -104,6 +106,7 @@ class metaregistrar implements IRegistrar
                 // Try to create new handle. In case of failure, quit function
                 if(!$ownerHandle = $this->createContact($whois, HANDLE_OWNER))
                 {
+                    if ($this->ErrorsOccurred()) return false;
                     return false;
                 }
             }
@@ -186,7 +189,7 @@ class metaregistrar implements IRegistrar
 
         // Start registering the domain, you can use $domain, $ownerHandle, $adminHandle, $techHandle, $nameservers
         $response = $this->mtr->createdomain($domain, $ownerHandle, $adminHandle, $techHandle, $requestns, $this->Period, $this->generateauth());
-
+        if ($this->ErrorsOccurred()) return false;
         return $response;
     }
 
@@ -486,6 +489,7 @@ class metaregistrar implements IRegistrar
      * @return mixed $list_domains
      */
     public function getSyncData($list_domains) {
+
         if (!$this->mtr) {
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
@@ -500,23 +504,17 @@ class metaregistrar implements IRegistrar
         /**
          * Scenario 2: We must request the info per domain. Take care of script timeout
          */
-
         $max_domains_to_check = 100;
-
         $checked_domains = 0;
         // Check domain one for one
-        foreach($list_domains as $domain_name => $value)
-        {
+        foreach($list_domains as $domain_name => $value) {
             // Ask registrar for information of domain
-            $response = array(); // Array with domain information
             $info = $this->mtr->getdomaininfo($domain_name);
-            if(!$info)
-            {
+            if (!$info) {
                 $list_domains[$domain_name]['Status']    = 'error';
-                $list_domains[$domain_name]['Error_msg'] = 'Domain not found';
+                $list_domains[$domain_name]['Error_msg'] = $this->mtr->Error[0];
                 continue;
             }
-
             // Add data
             $nameservers_array  = $info['nameservers'];
             $expirationdate     = date('Y-m-d',strtotime($info['expdate']));
@@ -532,10 +530,8 @@ class metaregistrar implements IRegistrar
 
             // Increment counter
             $checked_domains++;
-
             // Stop loop after max domains
-            if($checked_domains >= $max_domains_to_check)
-            {
+            if($checked_domains >= $max_domains_to_check) {
                 break;
             }
         }
@@ -566,6 +562,7 @@ class metaregistrar implements IRegistrar
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         $info = $this->mtr->getdomaininfo($domain);
+        if ($this->ErrorsOccurred()) return false;
         if ($info) {
             $contacts = [];
             $contacts['ownerHandle'] 	= $info['registrant'];
@@ -602,6 +599,7 @@ class metaregistrar implements IRegistrar
 
         // Create the contact
         $handle 	= $this->mtr->createcontact($whois);
+        if ($this->ErrorsOccurred()) return false;
         if ($handle) {
             return $handle;
         }
@@ -644,7 +642,9 @@ class metaregistrar implements IRegistrar
         // e.g.
         // $whois->ownerSurName			To obtain surname of domain owner
         // $whois->adminPhoneNumber   	To obtain phone number of admin contact data
-        return $this->mtr->updatecontact($handle, $whois);
+        $result = $this->mtr->updatecontact($handle, $whois);
+        if ($this->ErrorsOccurred()) return false;
+        return result;
     }
 
     /**
@@ -662,6 +662,7 @@ class metaregistrar implements IRegistrar
          */
         // Create the contact
         $response 	= $this->mtr->getcontactinfo($handle);
+        if ($this->ErrorsOccurred()) return false;
         $whois 		= new whois();
 
         /**
@@ -759,6 +760,7 @@ class metaregistrar implements IRegistrar
         if ((is_array($contacts)) && (count($contacts)>0)) {
             foreach ($contacts as $contact) {
                 $info = $this->mtr->getcontactinfo($contact);
+                if ($this->ErrorsOccurred()) return false;
                 $contact_list[] = [
                     "Identifier"    => $contact,
                     "Handle" 		=> $contact,
@@ -1256,6 +1258,13 @@ class metaregistrar implements IRegistrar
         return TRUE;
     }
 
+    private function ErrorsOccurred() {
+        if ((is_array($this->mtr->Error)) && (count($this->mtr->Error) > 0)) {
+            $this->Error = $this->mtr->Error;
+            return true;
+        }
+        return false;
+    }
 
     /**
      * Get class version information.

@@ -6,6 +6,10 @@ class mtr {
     private $username;
     private $password;
     private $testmode;
+    public $Error = [];
+    public $Success = [];
+
+
     
     /**
      * The connection to Metaregistrar EPP
@@ -36,7 +40,7 @@ class mtr {
     /**
      * @return bool
      */
-    private function login() {
+    private function login():bool {
         try {
             $this->conn = new Metaregistrar\EPP\metaregEppConnection();
             // Set parameters
@@ -45,14 +49,13 @@ class mtr {
             } else {
                 $this->conn->setHostname('ssl://epp.metaregistrar.com');
             }
-
             $this->conn->setPort(7000);
             $this->conn->setUsername($this->username);
             $this->conn->setPassword($this->password);
             $this->conn->setConnectionComment("HostFact user");
             // Send EPP login command
             if ($this->conn->login()) {
-//                $this->Success[] = "Succesfully logged-in to metaregistrar with user ".$this->User;
+                $this->Success[] = "Succesfully logged-in to metaregistrar with user ".$this->username;
                 $this->loggedin = true;
                 return true;
             } else {
@@ -63,6 +66,7 @@ class mtr {
             $this->Error[] = $e->getMessage();
             return false;
         }
+        return false;
     }
 
     /**
@@ -239,6 +243,7 @@ class mtr {
                 }
             }
         } catch (Metaregistrar\EPP\eppException $e) {
+
             $this->Error[] = $e->getMessage();
             return false;
         }
@@ -310,20 +315,27 @@ class mtr {
             $request = new \Metaregistrar\EPP\metaregInfoDomainRequest($domain);
             // Send the EPP request
             if ($response = $this->conn->request($request)) {
-                /* @var $response \Metaregistrar\EPP\eppDnssecInfoDomainResponse */
-                // Handle the response
-                $info  = [];
-                $info['registrant'] = $response->getDomainRegistrant();
-                $info['admin-c'] = $response->getDomainContact(\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_ADMIN);
-                $info['tech-c'] = $response->getDomainContact(\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_TECH);
-                $info['authcode'] = $response->getDomainAuthInfo();
-                $info['credate'] = $response->getDomainCreateDate();
-                $info['expdate'] = $response->getDomainExpirationDate();
-                $info['autorenew'] = $response->getAutoRenew();
-                $info['nameservers'] = explode(',',$response->getDomainNameserversCSV());
-                return $info;
+                if ($response->getResultCode() == 1000) {
+                    /* @var $response \Metaregistrar\EPP\eppDnssecInfoDomainResponse */
+                    // Handle the response
+                    $info  = [];
+                    $info['registrant'] = $response->getDomainRegistrant();
+                    $info['admin-c'] = $response->getDomainContact(\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_ADMIN);
+                    $info['tech-c'] = $response->getDomainContact(\Metaregistrar\EPP\eppContactHandle::CONTACT_TYPE_TECH);
+                    $info['authcode'] = $response->getDomainAuthInfo();
+                    $info['credate'] = $response->getDomainCreateDate();
+                    $info['expdate'] = $response->getDomainExpirationDate();
+                    $info['autorenew'] = $response->getAutoRenew();
+                    $info['nameservers'] = explode(',',$response->getDomainNameserversCSV());
+                    return $info;
+                } else {
+                    $this->Error[] = 'Algemene fout opgetreden bij opvragen domeinnaam informatie van '.$domainname;
+                    $this->Error[] = $response->getResultMessage();
+                    return false;
+                }
             }
         } catch (Metaregistrar\EPP\eppException $e) {
+            $this->Error[] = 'Algemene fout opgetreden bij opvragen domeinnaam informatie van '.$domainname;
             $this->Error[] = $e->getMessage();
             return false;
         }
