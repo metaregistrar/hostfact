@@ -42,13 +42,16 @@ class mtr {
      */
     private function login():bool {
         try {
-            $this->conn = new Metaregistrar\EPP\metaregEppConnection();
+            $this->conn = new Metaregistrar\EPP\eppConnection();
             // Set parameters
             if ($this->testmode) {
                 $this->conn->setHostname('ssl://epp-ote.metaregistrar.com');
             } else {
                 $this->conn->setHostname('ssl://epp.metaregistrar.com');
             }
+            $this->conn->useExtension('dns-ext-1.0');
+            $this->conn->useExtension('secDNS-1.1');
+            $this->conn->useExtension('command-ext-1.0');
             $this->conn->setPort(7000);
             $this->conn->setUsername($this->username);
             $this->conn->setPassword($this->password);
