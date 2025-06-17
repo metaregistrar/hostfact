@@ -16,6 +16,7 @@ require_once("3rdparty/domain/metaregistrar/mtr.php");
  *  2017-08-23      E.W. de Graaf       Added DNS management
  *  2025-06-01      E.W. de Graaf       Small fixes, up-to-date with php 8.x
  *  2025-06-01      E.W. de Graaf       Fixed proper syncing of auto-renew flag for domain name
+ *  2025-06-17      E.W. de Graaf       Major improvements in error handling
  * -------------------------------------------------------------------------------------
  */
 
