@@ -11,10 +11,10 @@ class metaregEppConnection extends eppConnection {
         // Check the greeting of the server to see which of these values you need to add
         $this->enableRgp();
         $this->enableDnssec();
-        parent::useExtension('polldata-1.0');
-        parent::useExtension('ext-1.0');
+        //parent::useExtension('polldata-1.0');
+        //parent::useExtension('ext-1.0');
         parent::useExtension('dns-ext-1.0');
-        parent::useExtension('ssl-1.0');
+        //parent::useExtension('ssl-1.0');
         parent::useExtension('command-ext-1.0');
 
     }
