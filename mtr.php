@@ -6,10 +6,7 @@ class mtr {
     private $username;
     private $password;
     private $testmode;
-    public $Error = [];
-    public $Success = [];
-
-
+    private $lastError;
     
     /**
      * The connection to Metaregistrar EPP
@@ -30,6 +27,14 @@ class mtr {
     
     function __destruct() {
         
+    }
+
+    private function setLastError($error) {
+        $this->lastError = $error;
+    }
+
+    public function getLastError(): string {
+        return $this->lastError;
     }
 
     /*
@@ -62,11 +67,11 @@ class mtr {
                 $this->loggedin = true;
                 return true;
             } else {
-                $this->Error[] = "Unable to login with user id: ".$this->username;
+                $this->setLastError("Unable to login with user id: ".$this->username);
                 return false;
             }
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
         return false;
@@ -117,6 +122,9 @@ class mtr {
                 return false;
             }
         }
+        if (!$authcode) {
+            $authcode = $this->generateauth();
+        }
         try {
             $domain = new \Metaregistrar\EPP\eppDomain($domainname);
             // Set domain parameters
@@ -145,15 +153,15 @@ class mtr {
                 if (($response->getResultCode()==1000) || ($response->getResultCode()==1001)) {
                     return true;
                 } else {
-                    $this->Error[] = $response->getResultMessage().' '.$response->getResultReason();
+                    $this->setLastError( $response->getResultMessage().' '.$response->getResultReason());
                     return false;
                 }
             } // ELSE function is caught by eppException
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname;
+        $this->setLastError( 'Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname);
         return false;
     }
 
@@ -202,15 +210,15 @@ class mtr {
                 if (($response->getResultCode()==1000) || ($response->getResultCode()==1001)) {
                     return true;
                 } else {
-                    $this->Error[] = $response->getResultMessage().' '.$response->getResultReason();
+                    $this->setLastError( $response->getResultMessage().' '.$response->getResultReason());
                     return false;
                 }
             }
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname;
+        $this->setLastError('Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname);
         return false;
     }
 
@@ -241,16 +249,15 @@ class mtr {
                 if ($response->getResultCode() == 1000) {
                     return true;
                 } else {
-                    $this->Error[] = $response->getResultMessage(). ' '.$response->getResultReason();
+                    $this->setLastError( $response->getResultMessage().' '.$response->getResultReason());
                     return false;
                 }
             }
         } catch (Metaregistrar\EPP\eppException $e) {
-
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'Algemene fout opgetreden bij bijwerken van contact '.$handle;
+        $this->setLastError('Algemene fout opgetreden bij bijwerken van contact '.$handle);
         return false;
     }
 
@@ -259,6 +266,14 @@ class mtr {
      * @return bool|string
      */
     public function createcontact($whois) {
+        if (strlen($whois->ownerEmailAddress)==0) {
+            $this->setLastError("Customer for the registration of this domain name has no e-mail address set");
+            return false;
+        }
+        if (strlen($whois->ownerPhoneNumber)==0) {
+            $this->setLastError("Customer for the registration of this domain name has no phone number set");
+            return false;
+        }
         if (!$this->loggedin) {
             if (!$this->login()) {
                 return false;
@@ -278,6 +293,7 @@ class mtr {
                 }
             }
             $contact = new \Metaregistrar\EPP\eppContact($postalinfo, $whois->ownerEmailAddress, $whois->ownerPhoneNumber, $whois->ownerFaxNumber);
+            $contact->setPassword('test');
             // Create an EPP contact:create request
             $create = new \Metaregistrar\EPP\eppCreateContactRequest($contact);
             // Send the request
@@ -287,15 +303,16 @@ class mtr {
                 if ($response->getResultCode() == 1000) {
                     return $response->getContactId();
                 } else {
-                    $this->Error[] = $response->getResultMessage(). ' '.$response->getResultReason();
+                    createLog('domain',$whois->ownerEmailAddress,$response->getResultMessage(),array(),false);
+                    $this->setLastError( $response->getResultMessage().' '.$response->getResultReason());
                     return false;
                 }
             }
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'Algemene fout opgetreden bij aanmaken nieuw contact';
+        $this->setLastError('Algemene fout opgetreden bij aanmaken nieuw contact');
         return false;
     }
 
@@ -332,17 +349,15 @@ class mtr {
                     $info['nameservers'] = explode(',',$response->getDomainNameserversCSV());
                     return $info;
                 } else {
-                    $this->Error[] = 'Algemene fout opgetreden bij opvragen domeinnaam informatie van '.$domainname;
-                    $this->Error[] = $response->getResultMessage();
+                    $this->setLastError($response->getResultMessage());
                     return false;
                 }
             }
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = 'Algemene fout opgetreden bij opvragen domeinnaam informatie van '.$domainname;
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'Algemene fout opgetreden bij opvragen domeinnaam informatie van '.$domainname;
+        $this->setLastError('Algemene fout opgetreden bij opvragen domeinnaam informatie van '.$domainname);
         return false;
     }
 
@@ -381,10 +396,10 @@ class mtr {
                 return $info;
             }
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'Algemene fout opgetreden bij opvragen contact informatie van '.$handle;
+        $this->setLastError('Algemene fout opgetreden bij opvragen contact informatie van '.$handle);
         return false;
     }
 
@@ -411,14 +426,14 @@ class mtr {
                     return true;
                 }
             } else {
-                $this->Error[] = $response->getResultMessage();
+                $this->setLastError($response->getResultMessage());
                 return false;
             }
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'Algemene fout opgetreden bij wijzigen nameserver informatie van '.$domainname;
+        $this->setLastError('Algemene fout opgetreden bij wijzigen nameserver informatie van '.$domainname);
         return false;
     }
 
@@ -488,10 +503,10 @@ class mtr {
                 return false;
             }
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'Algemene fout opgetreden bij wijzigen nameserver informatie van '.$domainname;
+        $this->setLastError('Algemene fout opgetreden bij wijzigen nameserver informatie van '.$domainname);
         return false;
     }
 
@@ -518,12 +533,12 @@ class mtr {
                 $test = $response->getCheckedDomains();
                 return $test[0]['available'];
             } else {
-                $this->Error[] = 'Error checking domain name '.$domainname;
+                $this->setLastError('Error checking domain name '.$domainname.': '.$response->getResultMessage());
                 return false;
             }
 
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
     }
@@ -552,15 +567,15 @@ class mtr {
                     return true;
                 }
             } else {
-                $this->Error[] = 'Error deleting domain name '.$domainname;
+                $this->setLastError('Error deleting domain name '.$domainname,': '.$response->getResultMessage());
                 return false;
             }
 
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'General error deleting domain name '.$domainname;
+        $this->setLastError('General error deleting domain name '.$domainname);
         return false;
     }
 
@@ -597,15 +612,15 @@ class mtr {
                     return true;
                 }
             } else {
-                $this->Error[] = 'Error locking domain name '.$domainname;
+                $this->setLastError('Error locking domain '.$domainname.': '.$response->getResultMessage());
                 return false;
             }
 
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
-        $this->Error[] = 'General error occurred locking domain name '.$domainname;
+        $this->setLastError('General error locking domain '.$domainname);
         return false;
     }
 
@@ -629,17 +644,17 @@ class mtr {
                 $content = $response->getContent();
                 return $content;
             } else {
-                $this->Error[] = 'Error retrieving DNS for '.$domainname;
+                $this->setLastError('Error getting DNS zone '.$domainname.': '.$response->getResultMessage());
                 return false;
             }
 
         } catch (Metaregistrar\EPP\eppException $e) {
             if ($e->getCode()==2303) {
                 $this->creatednszone($domainname);
-                $this->Error[] = "Er waren nog geen DNS gegevens bekend voor deze domeinnaam. De zone is nu aangemaakt, klik opnieuw op 'DNS beheer' om deze te bewerken";
+                $this->setLastError("Er waren nog geen DNS gegevens bekend voor deze domeinnaam. De zone is nu aangemaakt, klik opnieuw op 'DNS beheer' om deze te bewerken");
                 return false;
             } else {
-                $this->Error[] = $e->getMessage();
+                $this->setLastError($e->getMessage());
                 return false;
             }
         }
@@ -662,12 +677,12 @@ class mtr {
                 /* @var $response \Metaregistrar\EPP\metaregInfoDnsResponse */
                 return true;
             } else {
-                $this->Error[] = 'Error retrieving DNS for '.$domainname;
+                $this->setLastError('Error getting DNS zone '.$domainname.': '.$response->getResultMessage());
                 return false;
             }
 
         } catch (Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
     }
@@ -695,15 +710,15 @@ class mtr {
                 if ($response->getResultCode()==1000) {
                     return true;
                 } else {
-                    $this->Error[] = $response->getResultMessage();
+                    $this->setLastError('Error updating DNS zone '.$domainname.': '.$response->getResultMessage());
                     return false;
                 }
             } else {
-                $this->Error[] = "Error updating DNS";
+                $this->setLastError('Error updating DNS zone '.$domainname);
                 return false;
             }
         } catch (\Metaregistrar\EPP\eppException $e) {
-            $this->Error[] = $e->getMessage();
+            $this->setLastError($e->getMessage());
             return false;
         }
 

@@ -72,7 +72,10 @@ class metaregistrar implements IRegistrar
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         $result = $this->mtr->checkdomain($domain);
-        if ($this->ErrorsOccurred()) return false;
+        if (!$result) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
         return $result;
     }
 
@@ -105,10 +108,8 @@ class metaregistrar implements IRegistrar
             // If no existing handle is found, create new handle
             if ($ownerHandle == "") {
                 // Try to create new handle. In case of failure, quit function
-                if(!$ownerHandle = $this->createContact($whois, HANDLE_OWNER))
-                {
+                if(!$ownerHandle = $this->createContact($whois, HANDLE_OWNER)) {
                     if ($this->ErrorsOccurred()) return false;
-                    return false;
                 }
             }
 
@@ -120,61 +121,9 @@ class metaregistrar implements IRegistrar
             return false;
         }
 
-        $adminHandle = "";
-        // Check if a registrar-specific adminhandle for this domain already exists.
-        if (isset($whois->adminRegistrarHandles[$this->ClassName])) {
-            $adminHandle = $whois->adminRegistrarHandles[$this->ClassName];
-        }
-        // If not, check if WHOIS-data for admin contact is available to search or create new handle
-        elseif($whois->adminSurName != "") {
-            // Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
-            //$adminHandle = $this->getContactHandle($whois, HANDLE_ADMIN);
+        $adminHandle = $ownerHandle;
 
-            // If no existing handle is found, create new handle
-            if ($adminHandle == "") {
-                // Try to create new handle. In case of failure, quit function
-                if(!$adminHandle = $this->createContact($whois, HANDLE_ADMIN))
-                {
-                    return false;
-                }
-            }
-
-            // If a new handle is created or found, store in array. WeFact will store this data, which will result in faster registration next time.
-            $this->registrarHandles['admin'] = $adminHandle;
-        } else {
-            // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: Geen admin-c ingegeven voor domeinnaam '%s'.", $domain);
-            return false;
-        }
-
-        $techHandle = "";
-        // Check if a registrar-specific techhandle for this domain already exists.
-        if (isset($whois->techRegistrarHandles[$this->ClassName])) {
-            $techHandle = $whois->techRegistrarHandles[$this->ClassName];
-        }
-        // If not, check if WHOIS-data for tech contact is available to search or create new handle
-        elseif($whois->techSurName != "")
-        {
-            // Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
-            //$techHandle = $this->getContactHandle($whois, HANDLE_TECH);
-
-            // If no existing handle is found, create new handle
-            if ($techHandle == "")
-            {
-                // Try to create new handle. In case of failure, quit function
-                if(!$techHandle = $this->createContact($whois, HANDLE_TECH))
-                {
-                    return false;
-                }
-            }
-
-            // If a new handle is created or found, store in array. WeFact will store this data, which will result in faster registration next time.
-            $this->registrarHandles['tech'] = $techHandle;
-        } else {
-            // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: Geen tech-c ingegeven voor domeinnaam '%s'.", $domain);
-            return false;
-        }
+        $techHandle = $ownerHandle;
 
         // If your system uses nameserver groups or handles, you can check the $nameserver array and match these hostnames with your own system.
         $requestns = [];
@@ -189,8 +138,11 @@ class metaregistrar implements IRegistrar
         $this->Period = 1;
 
         // Start registering the domain, you can use $domain, $ownerHandle, $adminHandle, $techHandle, $nameservers
-        $response = $this->mtr->createdomain($domain, $ownerHandle, $adminHandle, $techHandle, $requestns, $this->Period, $this->generateauth());
-        if ($this->ErrorsOccurred()) return false;
+        $response = $this->mtr->createdomain($domain, $ownerHandle, $adminHandle, $techHandle, $requestns, $this->Period, null);
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
         return $response;
     }
 
@@ -309,7 +261,10 @@ class metaregistrar implements IRegistrar
 
         // Start transferring the domain, you can use $domain, $ownerHandle, $adminHandle, $techHandle, $nameservers, $authcode
         $response = $this->mtr->transferdomain($domain, $ownerHandle, $adminHandle, $techHandle, $nameservers, $this->Period, $authcode);
-
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
         return $response;
     }
 
@@ -328,7 +283,11 @@ class metaregistrar implements IRegistrar
             return $this->setDomainAutoRenew($domain, false);
         } else {
             // Delete the domain, you can use $domain
-            return $this->mtr->deletedomain($domain);
+            $response = $this->mtr->deletedomain($domain);
+            if (!$response) {
+                $this->Error[] = $this->mtr->getLastError();
+                return false;
+            }
         }
     }
 
@@ -361,8 +320,9 @@ class metaregistrar implements IRegistrar
         }
         else {
             // No information can be found
-            $this->Error[] 	= sprintf("Metaregistrar: Fout bij opvragen domeininfo van domeinnaam '%s'", $domain);
+            $this->Error[] = $this->mtr->getLastError();
             return false;
+
         }
     }
 
@@ -413,6 +373,9 @@ class metaregistrar implements IRegistrar
                             "registration_date" => $info['credate'],  // Empty or date in yyyy-mm-dd
                             "authkey" => $info['authinfo']));
                     $domain_array[] = $response;
+                } else {
+                    $this->Error[] = $this->mtr->getLastError();
+                    return false;
                 }
             }
 
@@ -438,7 +401,12 @@ class metaregistrar implements IRegistrar
         if (!$this->mtr) {
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
-        return $this->mtr->lockdomain($domain, $lock);
+        $response = $this->mtr->lockdomain($domain, $lock);
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
+        return $response;
     }
 
     /**
@@ -452,7 +420,12 @@ class metaregistrar implements IRegistrar
         if (!$this->mtr) {
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
-        return $this->mtr->updateautorenew($domain, $autorenew);
+        $response = $this->mtr->updateautorenew($domain, $autorenew);
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
+        return $response;
     }
 
     /**
@@ -466,21 +439,14 @@ class metaregistrar implements IRegistrar
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         $response 	= $this->mtr->getdomaininfo($domain);
-
-        /**
-         * Step 2) provide feedback to WeFact
-         */
-        if ($response)
-        {
-            // EPP code is retrieved
-            return $response['authcode'];
-        }
-        else
-        {
-            // EPP code cannot be retrieved
-            $this->Error[] 	= sprintf("Metaregistrar: Fout bij opvragen autorisatiecode voor domeinnaam '%s'", $domain);
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
             return false;
         }
+
+        // EPP code is retrieved
+        return $response['authcode'];
+
     }
 
     /**
@@ -513,7 +479,7 @@ class metaregistrar implements IRegistrar
             $info = $this->mtr->getdomaininfo($domain_name);
             if (!$info) {
                 $list_domains[$domain_name]['Status']    = 'error';
-                $list_domains[$domain_name]['Error_msg'] = $this->mtr->Error[0];
+                $list_domains[$domain_name]['Error_msg'] = $this->mtr->getLastError();
                 continue;
             }
             // Add data
@@ -563,15 +529,16 @@ class metaregistrar implements IRegistrar
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         $info = $this->mtr->getdomaininfo($domain);
-        if ($this->ErrorsOccurred()) return false;
         if ($info) {
             $contacts = [];
             $contacts['ownerHandle'] 	= $info['registrant'];
             $contacts['adminHandle'] 	= $info['admin-c'];
             $contacts['techHandle'] 	= $info['tech-c'];
             return $contacts;
+        } else {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
         }
-        return false;
     }
 
     /**
@@ -600,11 +567,11 @@ class metaregistrar implements IRegistrar
 
         // Create the contact
         $handle 	= $this->mtr->createcontact($whois);
-        if ($this->ErrorsOccurred()) return false;
         if ($handle) {
             return $handle;
         }
         else {
+            $this->Error[] 	= $this->mtr->getLastError();
             return false;
         }
     }
@@ -643,9 +610,12 @@ class metaregistrar implements IRegistrar
         // e.g.
         // $whois->ownerSurName			To obtain surname of domain owner
         // $whois->adminPhoneNumber   	To obtain phone number of admin contact data
-        $result = $this->mtr->updatecontact($handle, $whois);
-        if ($this->ErrorsOccurred()) return false;
-        return result;
+        $response = $this->mtr->updatecontact($handle, $whois);
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
+        return $response;
     }
 
     /**
@@ -663,14 +633,16 @@ class metaregistrar implements IRegistrar
          */
         // Create the contact
         $response 	= $this->mtr->getcontactinfo($handle);
-        if ($this->ErrorsOccurred()) return false;
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
         $whois 		= new whois();
 
         /**
          * Step 2) provide feedback to WeFact
          */
-        if($response)
-        {
+        if($response) {
             // The contact is found
             $whois->ownerCompanyName 	= $response['company'];
             $whois->ownerInitials		= "";
@@ -761,21 +733,26 @@ class metaregistrar implements IRegistrar
         if ((is_array($contacts)) && (count($contacts)>0)) {
             foreach ($contacts as $contact) {
                 $info = $this->mtr->getcontactinfo($contact);
-                if ($this->ErrorsOccurred()) return false;
-                $contact_list[] = [
-                    "Identifier"    => $contact,
-                    "Handle" 		=> $contact,
-                    "CompanyName"	=> $info['company'],
-                    "Initials"		=> "",
-                    "SurName" 		=> $info['name'],
-                    'Address'       => $info['address'],
-                    'ZipCode'       => $info['postcode'],
-                    'City'          => $info['city'],
-                    'Country'       => $info['countrycode'],
-                    'PhoneNumber'   => $info['phone'],
-                    'FaxNumber'     => $info['fax'],
-                    'EmailAddress'  => $info['email']];
+                if ($info) {
+                    $contact_list[] = [
+                        "Identifier" => $contact,
+                        "Handle" => $contact,
+                        "CompanyName" => $info['company'],
+                        "Initials" => "",
+                        "SurName" => $info['name'],
+                        'Address' => $info['address'],
+                        'ZipCode' => $info['postcode'],
+                        'City' => $info['city'],
+                        'Country' => $info['countrycode'],
+                        'PhoneNumber' => $info['phone'],
+                        'FaxNumber' => $info['fax'],
+                        'EmailAddress' => $info['email']];
+                } else {
+                    $this->Error[] = $this->mtr->getLastError();
+                    return false;
+                }
             }
+
         }
 
 
@@ -814,6 +791,10 @@ class metaregistrar implements IRegistrar
             }
         }
         $response = $this->mtr->updatenameservers($domain, $nameservers);
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
         return $response;
     }
 
@@ -881,6 +862,7 @@ class metaregistrar implements IRegistrar
         }
         else {
             // DNS zone does not exist or API call failed
+            $this->Error[] = $this->mtr->getLastError();
             return false;
         }
     }
@@ -924,7 +906,12 @@ class metaregistrar implements IRegistrar
             }
         }
 
-        return $this->mtr->updatednszone($domain, $adds, $dels);
+        $response = $this->mtr->updatednszone($domain, $adds, $dels);
+        if (!$response) {
+            $this->Error[] = $this->mtr->getLastError();
+            return false;
+        }
+        return $response;
 
 
     }
@@ -1259,13 +1246,6 @@ class metaregistrar implements IRegistrar
         return TRUE;
     }
 
-    private function ErrorsOccurred() {
-        if ((is_array($this->mtr->Error)) && (count($this->mtr->Error) > 0)) {
-            $this->Error = $this->mtr->Error;
-            return true;
-        }
-        return false;
-    }
 
     /**
      * Get class version information.
