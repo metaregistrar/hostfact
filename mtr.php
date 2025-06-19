@@ -34,7 +34,12 @@ class mtr {
     }
 
     public function getLastError(): string {
-        return $this->lastError;
+        if (is_string($this->lastError)) {
+            return $this->lastError;
+        } else {
+            return '';
+        }
+
     }
 
     /*
