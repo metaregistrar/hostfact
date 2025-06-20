@@ -72,7 +72,7 @@ class metaregistrar implements IRegistrar
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         $result = $this->mtr->checkdomain($domain);
-        if (!$result) {
+        if (strlen($this->mtr->getLastError())>0) {
             $this->Error[] = $this->mtr->getLastError();
             return false;
         }
@@ -96,7 +96,6 @@ class metaregistrar implements IRegistrar
          * $this->DNSTemplateID
          * $this->DNSTemplateName
          */
-        $ownerHandle = "";
         // Check if a registrar-specific ownerhandle for this domain already exists.
         if (isset($whois->ownerRegistrarHandles[$this->ClassName])) {
             $ownerHandle = $whois->ownerRegistrarHandles[$this->ClassName];
@@ -122,7 +121,6 @@ class metaregistrar implements IRegistrar
         }
 
         $adminHandle = $ownerHandle;
-
         $techHandle = $ownerHandle;
 
         // If your system uses nameserver groups or handles, you can check the $nameserver array and match these hostnames with your own system.
@@ -162,98 +160,32 @@ class metaregistrar implements IRegistrar
          * $this->DNSTemplateID
          * $this->DNSTemplateName
          */
-
-        $ownerHandle = "";
         // Check if a registrar-specific ownerhandle for this domain already exists.
-        if (isset($whois->ownerRegistrarHandles[$this->ClassName]))
-        {
+        if (isset($whois->ownerRegistrarHandles[$this->ClassName])) {
             $ownerHandle = $whois->ownerRegistrarHandles[$this->ClassName];
         }
         // If not, check if WHOIS-data for owner contact is available to search or create new handle
-        elseif($whois->ownerSurName != "")
-        {
+        elseif($whois->ownerSurName != "") {
             // Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
-            //$ownerHandle = $this->getContactHandle($whois, HANDLE_OWNER);
-
+            $ownerHandle = $this->getContactHandle($whois, HANDLE_OWNER);
             // If no existing handle is found, create new handle
-            if ($ownerHandle == "")
-            {
+            if ($ownerHandle == "") {
                 // Try to create new handle. In case of failure, quit function
-                if(!$ownerHandle = $this->createContact($whois, HANDLE_OWNER))
-                {
-                    return false;
+                if(!$ownerHandle = $this->createContact($whois, HANDLE_OWNER)) {
+                    if ($this->ErrorsOccurred()) return false;
                 }
             }
 
-            // If a new handle is created or found, store in array. WeFact will store this data, which will result in faster transfer next time.
+            // If a new handle is created or found, store in array. WeFact will store this data, which will result in faster registration next time.
             $this->registrarHandles['owner'] = $ownerHandle;
         } else {
             // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: Geen eigenaar opgegeven voor domeinnaam '%s'.", $domain);
+            $this->Error[] = sprintf("Metaregistrar: Geen eigenaar ingesteld voor domeinnaam '%s'.", $domain);
             return false;
         }
 
-        $adminHandle = "";
-        // Check if a registrar-specific adminhandle for this domain already exists.
-        if (isset($whois->adminRegistrarHandles[$this->ClassName]))
-        {
-            $adminHandle = $whois->adminRegistrarHandles[$this->ClassName];
-        }
-        // If not, check if WHOIS-data for admin contact is available to search or create new handle
-        elseif($whois->adminSurName != "")
-        {
-            // Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
-            //$adminHandle = $this->getContactHandle($whois, HANDLE_ADMIN);
-
-            // If no existing handle is found, create new handle
-            if ($adminHandle == "")
-            {
-                // Try to create new handle. In case of failure, quit function
-                if(!$adminHandle = $this->createContact($whois, HANDLE_ADMIN))
-                {
-                    return false;
-                }
-            }
-
-            // If a new handle is created or found, store in array. WeFact will store this data, which will result in faster transfer next time.
-            $this->registrarHandles['admin'] = $adminHandle;
-        } else {
-            // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: Geen admin-c contact opgegeven voor domeinnaam '%s'.", $domain);
-            return false;
-        }
-
-        $techHandle = "";
-        // Check if a registrar-specific techhandle for this domain already exists.
-        if (isset($whois->techRegistrarHandles[$this->ClassName]))
-        {
-            $techHandle = $whois->techRegistrarHandles[$this->ClassName];
-        }
-        // If not, check if WHOIS-data for tech contact is available to search or create new handle
-        elseif($whois->techSurName != "")
-        {
-            // Search for existing handle, based on WHOIS data (not supported by the Metaregistrar API)
-            //$techHandle = $this->getContactHandle($whois, HANDLE_TECH);
-
-            // If no existing handle is found, create new handle
-            if ($techHandle == "")
-            {
-                // Try to create new handle. In case of failure, quit function
-                if(!$techHandle = $this->createContact($whois, HANDLE_TECH))
-                {
-                    return false;
-                }
-            }
-
-            // If a new handle is created or found, store in array. WeFact will store this data, which will result in faster transfer next time.
-            $this->registrarHandles['tech'] = $techHandle;
-        } else {
-            // If no handle can be created, because data is missing, quit function
-            $this->Error[] = sprintf("Metaregistrar: Geen tech-c contact opgegeven voor domeinnaam '%s'.", $domain);
-            return false;
-        }
-
-        // If your system uses nameserver groups or handles, you can check the $nameserver array and match these hostnames with your own system.
+        $adminHandle = $ownerHandle;
+        $techHandle = $ownerHandle;
 
         // Determine period for transfer in years, based on your TLD properties.
         // $this->Period is also used in WeFact, for determining the renewal date.

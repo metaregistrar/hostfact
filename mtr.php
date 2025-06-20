@@ -206,6 +206,7 @@ class mtr {
             $domain->setPeriod($period);
             $domain->setPeriodUnit('y');
             $domain->setAuthorisationCode($authcode);
+
             // Create an EPP transfer request
             $transfer = new \Metaregistrar\EPP\metaregEppTransferExtendedRequest(\Metaregistrar\EPP\eppTransferRequest::OPERATION_REQUEST,$domain);
             // Send the EPP request
@@ -218,6 +219,9 @@ class mtr {
                     $this->setLastError( $response->getResultMessage().' '.$response->getResultReason());
                     return false;
                 }
+            } else {
+                $this->setLastError("Unknown error");
+                return false;
             }
         } catch (Metaregistrar\EPP\eppException $e) {
             $this->setLastError($e->getMessage());
