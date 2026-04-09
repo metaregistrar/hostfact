@@ -220,15 +220,13 @@ class mtr {
                     return false;
                 }
             } else {
-                $this->setLastError("Unknown error");
+	            $this->setLastError('Algemene fout opgetreden bij verhuizen van domeinnaam '.$domainname);
                 return false;
             }
         } catch (Metaregistrar\EPP\eppException $e) {
             $this->setLastError($e->getMessage());
             return false;
         }
-        $this->setLastError('Algemene fout opgetreden bij aanvragen van domeinnaam '.$domainname);
-        return false;
     }
 
     public function updatecontact($handle, $whois) {
