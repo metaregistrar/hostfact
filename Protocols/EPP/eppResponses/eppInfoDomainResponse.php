@@ -44,14 +44,17 @@ class eppInfoDomainResponse extends eppInfoResponse {
     /**
      * Receive an array of statuses
      *
-     * @return null|string[]
+     * @return null|eppStatus[]
      */
     public function getDomainStatuses() {
         $statuses = null;
         $xpath = $this->xPath();
-        $result = $xpath->query('/epp:epp/epp:response/epp:resData/domain:infData/domain:status/@s');
+    //    $result = $xpath->query('/epp:epp/epp:response/epp:resData/domain:infData/domain:status/@s');
+        $result = $xpath->query('/epp:epp/epp:response/epp:resData/domain:infData/domain:status');
         foreach ($result as $status) {
-            $statuses[] = $status->nodeValue;
+            $statuses[] = new eppStatus($status->getAttribute('s'),
+                                        $status->getAttribute('lang'),
+                                         $status->nodeValue);
         }
         return $statuses;
     }
@@ -62,7 +65,12 @@ class eppInfoDomainResponse extends eppInfoResponse {
      * @return string statuses
      */
     public function getDomainStatusCSV() {
-        return parent::arrayToCSV($this->getDomainStatuses());
+        $statuses = [];
+        foreach ($this->getDomainStatuses() as $status) {
+            /* @var $status eppStatus */
+            $statuses[] = $status->getStatusname();
+        }
+        return parent::arrayToCSV($statuses);
     }
 
     /**

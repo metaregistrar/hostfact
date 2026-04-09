@@ -1,8 +1,8 @@
 <?php
 $version['name']            = "Metaregistrar";
-$version['api_version']     = "6.x";
-$version['date']            = "2025-06-01"; // Last modification date
-$version['version']         = "1.2"; // Version released for WeFact
+$version['api_version']     = "3.x";
+$version['date']            = "2026-04-01"; // Last modification date
+$version['version']         = "1.3"; // Version released for WeFact
 $version['autorenew']       = true; // AutoRenew is default?  true | false
 $version['handle_support']  = true; // Handles are supported? true | false
 $version['cancel_direct']   = true; // Possible to terminate domains immediately?  true | false
