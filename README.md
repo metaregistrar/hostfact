@@ -6,7 +6,7 @@ Usage:
 - Create a directory named **metaregistrar** in /Pro/3rdparty/domain/ and copy all this code to this directory
 - In HostFact, select "Metaregistrar" as new registrar, select domain name and DNS management
 - Retrieve your EPP login username and password from the Metaregistrar control panel
-- Enter your EPP login username and password from Metaregistrar
+- Enter your EPP login username and password from Metaregistrar in Hostfact
 - Select whether the login is an OTE login (function test-mode on) or live login (function test-mode off)
 - Whitelist the IP address where your HostFact service runs within the Metaregistrar back-end
 
@@ -24,4 +24,4 @@ _ns1.yourdomainprovider.net, ns2.yourdomainprovider.net, ns3.yourdomainprovider.
 
 #### TODO
 - Add glue records when hostnames match the domainname
-- Add SSL support
+- Add support for requesting SSL certificates
