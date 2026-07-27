@@ -19,7 +19,7 @@ require_once("3rdparty/domain/metaregistrar/mtr.php");
  *  2025-06-01      E.W. de Graaf       Fixed proper syncing of auto-renew flag for domain name
  *  2025-06-17      E.W. de Graaf       Major improvements in error handling
  *  2026            E.W. de Graaf       Added SSL certificate processing
- *  2026-07-27      E.W. de Graaf       Added contact property processing for SE and NU domains
+ *  2026-07-27      E.W. de Graaf       Added contact property processing for NU, SE and PT domains
  * -------------------------------------------------------------------------------------
  */
 
@@ -174,6 +174,26 @@ class metaregistrar implements IRegistrar
 			    }
 		    } else {
 			    $this->Error[] = "Voor het registreren van .SE domeinnamen, vul het veld 'KVK nummer' in het contact. Bij privepersonen kunt u het paspoortnummer van deze persoon invullen in dit veld.\n";
+			    return false;
+		    }
+	    }
+	    if (str_contains($domain,'.pt')) {
+		    if ((isset($whois->ownerTaxNumber)) && (strlen($whois->ownerTaxNumber)>0)) {
+			    $properties = $this->mtr->readcontactproperties($ownerHandle,'DnsPt');
+			    if (is_array($properties)) {
+				    if ((!isset($properties['vatno'])) || ($properties['vatno'] != $whois->ownerCompanyNumber)) {
+					    $properties['vatno'] = $whois->ownerTaxNumber;
+					    if (!$this->mtr->updatecontactproperties($ownerHandle,'DnsPt',$properties)) {
+						    $this->Error[] = $this->mtr->getLastError();
+						    return false;
+					    }
+				    }
+			    } else {
+				    $this->Error[] = $this->mtr->getLastError();
+				    return false;
+			    }
+		    } else {
+			    $this->Error[] = "Voor het registreren van .PT domeinnamen, vul het veld 'BTW nummer' in het contact. Bij privepersonen kunt u het paspoortnummer van deze persoon invullen in dit veld.\n";
 			    return false;
 		    }
 	    }
