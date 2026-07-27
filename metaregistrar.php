@@ -173,7 +173,7 @@ class metaregistrar implements IRegistrar
 				    return false;
 			    }
 		    } else {
-			    $this->Error[] = "Voor het registreren van .NU domeinnamen, vul het veld 'KVK nummer' in het contact. Bij privepersonen kunt u het paspoortnummer van deze persoon invullen in dit veld.\n";
+			    $this->Error[] = "Voor het registreren van .SE domeinnamen, vul het veld 'KVK nummer' in het contact. Bij privepersonen kunt u het paspoortnummer van deze persoon invullen in dit veld.\n";
 			    return false;
 		    }
 	    }
