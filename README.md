@@ -24,4 +24,3 @@ _ns1.yourdomainprovider.net, ns2.yourdomainprovider.net, ns3.yourdomainprovider.
 
 #### TODO
 - Add glue records when hostnames match the domainname
-- Add support for requesting SSL certificates

@@ -1,8 +1,8 @@
 <?php
 $version['name']            = "Metaregistrar";
-$version['api_version']     = "3.x";
-$version['date']            = "2026-04-01"; // Last modification date
-$version['version']         = "1.3"; // Version released for WeFact
+$version['api_version']     = "3.6";
+$version['date']            = "2026-06-01"; // Last modification date
+$version['version']         = "1.5"; // Version released for WeFact/Hostfact
 $version['autorenew']       = true; // AutoRenew is default?  true | false
 $version['handle_support']  = true; // Handles are supported? true | false
 $version['cancel_direct']   = true; // Possible to terminate domains immediately?  true | false
@@ -18,7 +18,7 @@ $version['dev_phone']		= '+31.85 888 5692'; // Your phone number for support que
 // Does this registrar integration support functions related to domains?
 $version['domain_support']  = true;
 // Does this registrar integration support functions related to SSL certificates?
-$version['ssl_support']   	= false;
+$version['ssl_support']   	= true;
 
 // Does this registrar integration support functions related to DNS management?
 $version['dns_management_support']   	= true;

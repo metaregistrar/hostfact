@@ -7,8 +7,9 @@ require_once("3rdparty/domain/metaregistrar/mtr.php");
  * Metaregistrar - IRegistrar
  *
  * Author		: Ewout de Graaf
- * Copyright	: (c) 2018 Metaregistrar BV
- * Version 		: 1.2
+ * Copyright	: (c) 2026 Metaregistrar BV
+ * Version 		: 1.5
+ * Documentation: https://www.hostfact.nl/developer/registrar-class/
  *
  * CHANGE LOG:
  * -------------------------------------------------------------------------------------
@@ -17,6 +18,8 @@ require_once("3rdparty/domain/metaregistrar/mtr.php");
  *  2025-06-01      E.W. de Graaf       Small fixes, up-to-date with php 8.x
  *  2025-06-01      E.W. de Graaf       Fixed proper syncing of auto-renew flag for domain name
  *  2025-06-17      E.W. de Graaf       Major improvements in error handling
+ *  2026            E.W. de Graaf       Added SSL certificate processing
+ *  2026-07-27      E.W. de Graaf       Added contact property processing for SE and NU domains
  * -------------------------------------------------------------------------------------
  */
 
@@ -85,13 +88,20 @@ class metaregistrar implements IRegistrar
      *
      * @param 	string	$domain			The domainname that needs to be registered.
      * @param 	array	$nameservers	The nameservers for the new domain.
-     * @param 	array	$whois			The customer information for the domain's whois information.
+     * @param 	object	$whois			The customer information for the domain's whois information.
      * @return 	bool					True on success; False otherwise.
+     *
+     *
+     *
+     * CONTENTS OF WHOIS
+     * • O:5:"Whois":2:{s:17:"Whoisproperties";a:18:{i:0;s:6:"Handle";i:1;s:3:"Sex";i:2;s:8:"Initials";i:3;s:7:"SurName";i:4;s:7:"Address";i:5;s:8:"Address2";i:6;s:4:"City";i:7;s:5:"State";i:8;s:7:"ZipCode";i:9;s:11:"PhoneNumber";i:10;s:9:"FaxNumber";i:11;s:12:"EmailAddress";i:12;s:11:"CompanyName";i:13;s:16:"CompanyLegalForm";i:14;s:13:"CompanyNumber";i:15;s:7:"Country";i:16;s:16:"RegistrarHandles";i:17;s:9:"TaxNumber";}s:11:"Whoisdata";a:57:{s:21:"ownerRegistrarHandles";a:1:{s:13:"metaregistrar";s:24:"JDB_1ka070r23844fae844dd";}s:8:"ownerSex";s:1:"m";s:13:"ownerInitials";s:1:"E";s:12:"ownerSurName";s:8:"de Graaf";s:16:"ownerCompanyName";s:16:"Metaregistrar BV";s:18:"ownerCompanyNumber";s:8:"57931224";s:21:"ownerCompanyLegalForm";s:6:"ANDERS";s:14:"ownerTaxNumber";s:14:"NL852797643B01";s:12:"ownerAddress";s:28:"Noothoven van Goorstraat 11E";s:13:"ownerAddress2";s:0:"";s:12:"ownerZipCode";s:6:"2806RA";s:9:"ownerCity";s:5:"Gouda";s:10:"ownerState";s:0:"";s:12:"ownerCountry";s:2:"NL";s:16:"ownerPhoneNumber";s:12:"+31708900654";s:14:"ownerFaxNumber";s:0:"";s:17:"ownerEmailAddress";s:23:"ewout@metaregistrar.com";s:19:"ownerInternalHandle";s:11:"DB10000-002";s:20:"ownerRegistrarHandle";s:24:"JDB_1ka070r23844fae844dd";s:21:"adminRegistrarHandles";a:1:{s:13:"metaregistrar";s:24:"JDB_1ka070r23844fae844dd";}s:8:"adminSex";s:1:"m";s:13:"adminInitials";s:1:"E";s:12:"adminSurName";s:8:"de Graaf";s:16:"adminCompanyName";s:16:"Metaregistrar BV";s:18:"adminCompanyNumber";s:8:"57931224";s:21:"adminCompanyLegalForm";s:6:"ANDERS";s:14:"adminTaxNumber";s:14:"NL852797643B01";s:12:"adminAddress";s:28:"Noothoven van Goorstraat 11E";s:13:"adminAddress2";s:0:"";s:12:"adminZipCode";s:6:"2806RA";s:9:"adminCity";s:5:"Gouda";s:10:"adminState";s:0:"";s:12:"adminCountry";s:2:"NL";s:16:"adminPhoneNumber";s:12:"+31708900654";s:14:"adminFaxNumber";s:0:"";s:17:"adminEmailAddress";s:23:"ewout@metaregistrar.com";s:19:"adminInternalHandle";s:11:"DB10000-002";s:20:"adminRegistrarHandle";s:24:"JDB_1ka070r23844fae844dd";s:20:"techRegistrarHandles";a:1:{s:13:"metaregistrar";s:24:"JDB_1ka070r23844fae844dd";}s:7:"techSex";s:1:"m";s:12:"techInitials";s:1:"E";s:11:"techSurName";s:8:"de Graaf";s:15:"techCompanyName";s:16:"Metaregistrar BV";s:17:"techCompanyNumber";s:8:"57931224";s:20:"techCompanyLegalForm";s:6:"ANDERS";s:13:"techTaxNumber";s:14:"NL852797643B01";s:11:"techAddress";s:28:"Noothoven van Goorstraat 11E";s:12:"techAddress2";s:0:"";s:11:"techZipCode";s:6:"2806RA";s:8:"techCity";s:5:"Gouda";s:9:"techState";s:0:"";s:11:"techCountry";s:2:"NL";s:15:"techPhoneNumber";s:12:"+31708900654";s:13:"techFaxNumber";s:0:"";s:16:"techEmailAddress";s:23:"ewout@metaregistrar.com";s:18:"techInternalHandle";s:11:"DB10000-002";s:19:"techRegistrarHandle";s:24:"JDB_1ka070r23844fae844dd";}}
      */
+
     function registerDomain($domain, $nameservers = array(), $whois = null) {
         if (!$this->mtr) {
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
+
         /** if you use DNS management, the following variables are also available
          * $this->DNSTemplateID
          * $this->DNSTemplateName
@@ -119,6 +129,54 @@ class metaregistrar implements IRegistrar
             $this->Error[] = sprintf("Metaregistrar: Geen eigenaar ingesteld voor domeinnaam '%s'.", $domain);
             return false;
         }
+		// For certain extensions, the contact handle needs extra properties
+	    // Check $ownerHandle to see if the properties are there, and if not, create them
+		if (str_contains($domain,'.nu')) {
+			if ((isset($whois->ownerCompanyNumber)) && (strlen($whois->ownerCompanyNumber)>0)) {
+				$properties = $this->mtr->readcontactproperties($ownerHandle,'IisNu');
+				if (is_array($properties)) {
+					if ((!isset($properties['orgno'])) || ($properties['orgno'] != $whois->ownerCompanyNumber)) {
+						$properties['orgno'] = '[NL]'. $whois->ownerCompanyNumber;
+						if ((isset($whois->ownerTaxNumber)) && (strlen($whois->ownerTaxNumber)>0)) {
+							$properties['vatno'] = $whois->ownerTaxNumber;
+						}
+						if (!$this->mtr->updatecontactproperties($ownerHandle,'IisNu',$properties)) {
+							$this->Error[] = $this->mtr->getLastError();
+							return false;
+						}
+					}
+				} else {
+					$this->Error[] = $this->mtr->getLastError();
+					return false;
+				}
+			} else {
+				$this->Error[] = "Voor het registreren van .NU domeinnamen, vul het veld 'KVK nummer' in het contact. Bij privepersonen kunt u het paspoortnummer van deze persoon invullen in dit veld.\n";
+				return false;
+			}
+		}
+	    if (str_contains($domain,'.se')) {
+		    if ((isset($whois->ownerCompanyNumber)) && (strlen($whois->ownerCompanyNumber)>0)) {
+			    $properties = $this->mtr->readcontactproperties($ownerHandle,'IisSE');
+			    if (is_array($properties)) {
+				    if ((!isset($properties['orgno'])) || ($properties['orgno'] != $whois->ownerCompanyNumber)) {
+					    $properties['orgno'] = '[NL]'. $whois->ownerCompanyNumber;
+					    if ((isset($whois->ownerTaxNumber)) && (strlen($whois->ownerTaxNumber)>0)) {
+						    $properties['vatno'] = $whois->ownerTaxNumber;
+					    }
+					    if (!$this->mtr->updatecontactproperties($ownerHandle,'IisSe',$properties)) {
+						    $this->Error[] = $this->mtr->getLastError();
+							return false;
+					    }
+				    }
+			    } else {
+				    $this->Error[] = $this->mtr->getLastError();
+				    return false;
+			    }
+		    } else {
+			    $this->Error[] = "Voor het registreren van .NU domeinnamen, vul het veld 'KVK nummer' in het contact. Bij privepersonen kunt u het paspoortnummer van deze persoon invullen in dit veld.\n";
+			    return false;
+		    }
+	    }
 
         $adminHandle = $ownerHandle;
         $techHandle = $ownerHandle;
@@ -610,7 +668,7 @@ class metaregistrar implements IRegistrar
             $this->mtr = new mtr($this->User, $this->Password, $this->Testmode);
         }
         // Function to search contact by whois data is not supported
-        $this->Error[] = 'Zoeken van contactinformatie via de whois wordt niet ondersteund door de Metaregistrar API';
+        $this->Error[] = 'Zoeken van contactinformatie via de naam of adres is mogelijk bij de Metaregistrar API';
         return false;
 
         // Determine which contact type should be found
@@ -849,38 +907,28 @@ class metaregistrar implements IRegistrar
     }
 
     /**
-     * Retrieve all SSL products from registrar
+     * Retrieve all SSL products from metaregistrar
      *
      * @param string $ssl_type  Optional filter for SSL validation type
      * @return array
      */
     public function ssl_list_products($ssl_type = '')
     {
-        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
-        return false;
+	    /**
+	     * Step 1) get all SSL products from the registrar
+	     */
 
-        /**
-         * Step 1) get all SSL products filtered by the $ssl_type
-         */
-        $response 	= true;
 
-        /**
-         * Step 2) provide feedback to WeFact
-         */
-        $products_array = array();
-
-        if($response === true)
-        {
-            foreach($response->response->products->product as $product)
-            {
-                $products_array[] = array(	'name' => $product->name,
-                    'brand' => $product->brand,
-                    'templatename' => $product->code,
-                    'type' => 'domain'); // domain, extended or organization
-            }
-        }
-
-        return $products_array;
+	    /**
+	     * Step 2) provide feedback to HostFact
+	     */
+	    $products_array = [];
+	    $products_array[] = [
+		    'name' => 'Comodo Postive SSL Single domain',
+		    'brand' => 'Comodo',
+		    'templatename' => 'COMO.SIN.DV',
+		    'type' => 'domain'];  // domain, extended or organization
+	    return $products_array;
     }
 
     /**
@@ -937,11 +985,55 @@ class metaregistrar implements IRegistrar
      * @param array $ssl_info   Array with info regarding the SSL certificate
      * @param object $whois     Object with WHOIS data
      * @return bool
+     *
+     *
+     * $ssl_info = [
+     *      "commonname"            => hostfactssl.nl
+     *      "type"                  => organization
+     *      "wildcard"              => no
+     *      "multidomain"           => no
+     *      "multidomain_records"   => []
+     *      "approver_email"        => administrator@hostfactssl.nl
+     *      "csr"                   =>  -----BEGIN CERTIFICATE REQUEST-----
+     *                                  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+     *                                  -----END CERTIFICATE REQUEST-----
+     *      "server_software"       => linux
+     *      "period"                => 2
+     *      "templatename"          => 1
+     * ];
+     *
+     *
+     *
+     * $whois = new whois();
+     *
+     * // Owner
+     * $whois->ownerHandle                = ""; // Handle name, empty or string
+     * $whois->ownerSex                = "m"; // m or f
+     * $whois->ownerInitials            = "C.";
+     * $whois->ownerSurName            = "Jackson";
+     * $whois->ownerCompanyName        = "BusinessName";
+     * $whois->ownerCompanyNumber        = "123456789";
+     * $whois->ownerCompanyLegalForm    = "BV";
+     * $whois->ownerTaxNumber            = "NL12345679B01";
+     * $whois->ownerAddress            = "222 E 14th Street";
+     * $whois->ownerZipCode            = "10003";
+     * $whois->ownerCity                = "New York";
+     * $whois->ownerCountry            = "US";
+     * $whois->ownerPhoneNumber        = "+1 23 45 67 80";
+     * $whois->ownerFaxNumber            = "+1 23 45 67 81";
+     * $whois->ownerEmailAddress        = "info@hostfact.nl";
+     *
+     * // Admin
+     * $whois->adminHandle                = "";
+     * $whois->adminSex                = "m";
+     * ...
+     *
+     * // Tech
+     * $whois->techHandle                = "";
+     * $whois->techSex                    = "m";
+     * ...
      */
-    public function ssl_request_certificate($ssl_info, $whois)
-    {
-        $this->Error[] = "SSL Certificaten worden nog niet ondersteund door de Metaregistrar API";
-        return false;
+    public function ssl_request_certificate($ssl_info, $whois) {
 
         /**
          * Step 1) request SSL certificate at registrar

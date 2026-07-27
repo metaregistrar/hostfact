@@ -229,6 +229,11 @@ class mtr {
         }
     }
 
+	/**
+	 * @param $handle
+	 * @param $whois
+	 * @return bool
+	 */
     public function updatecontact($handle, $whois) {
         if (!$this->loggedin) {
             if (!$this->login()) {
@@ -322,6 +327,79 @@ class mtr {
         $this->setLastError('Algemene fout opgetreden bij aanmaken nieuw contact');
         return false;
     }
+
+	/**
+	 * @param $contacthandle
+	 * @param $registry
+	 * @return array|false
+	 */
+	public function readcontactproperties($contacthandle, $registry) {
+		$result = [];
+		if (!$this->loggedin) {
+			if (!$this->login()) {
+				return false;
+			}
+		}
+		try {
+			$handle = new \Metaregistrar\EPP\eppContactHandle($contacthandle);
+			$request = new \Metaregistrar\EPP\eppInfoContactRequest($handle);
+			if ($response = $this->conn->request($request)) {
+				if ($response->getResultCode() == 1000) {
+					/* @var $response \Metaregistrar\EPP\metaregEppInfoContactResponse */
+					if ($registry == 'IisNu') {
+						$result['orgno'] = $response->getContactProperty($registry,'orgno');
+						$result['vatno'] = $orgno = $response->getContactProperty($registry,'vatno');
+					}
+					if ($registry == 'IisSe') {
+						$result['orgno'] = $response->getContactProperty($registry,'orgno');
+						$result['vatno'] = $orgno = $response->getContactProperty($registry,'vatno');
+					}
+					return $result;
+				} else {
+					$this->setLastError($response->getResultMessage());
+					return false;
+				}
+			}
+		} catch (Metaregistrar\EPP\eppException $e) {
+			$this->setLastError($e->getMessage());
+			return false;
+		}
+		$this->setLastError('Algemene fout opgetreden bij opvragen contact informatie van '.$contacthandle);
+		return false;
+	}
+
+	public function updatecontactproperties($handle, $registry, $properties) {
+		if (!$this->loggedin) {
+			if (!$this->login()) {
+				return false;
+			}
+		}
+		try {
+			// Set the handle to be updated
+			$contacthandle = new \Metaregistrar\EPP\eppContactHandle($handle);
+			// Create an EPP update request
+			$update = new \Metaregistrar\EPP\metaregEppUpdateContactRequest($contacthandle, null, null, null);
+			foreach ($properties as $property => $value) {
+				$update->addContactProperty($registry,$property,$value);
+			}
+			// Send the EPP request
+			if ($response = $this->conn->request($update)) {
+				/* @var $response \Metaregistrar\EPP\eppUpdateContactResponse */
+				// Process the response
+				if ($response->getResultCode() == 1000) {
+					return true;
+				} else {
+					$this->setLastError( $response->getResultMessage().' '.$response->getResultReason());
+					return false;
+				}
+			}
+		} catch (Metaregistrar\EPP\eppException $e) {
+			$this->setLastError($e->getMessage());
+			return false;
+		}
+		$this->setLastError('Algemene fout opgetreden bij bijwerken van contact '.$handle);
+		return false;
+	}
 
 
     /**
